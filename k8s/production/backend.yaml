@@ -1,0 +1,244 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: sms-backend
+  namespace: sms-production
+  labels:
+    app: sms-backend
+    component: api
+spec:
+  replicas: 3
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 1
+  selector:
+    matchLabels:
+      app: sms-backend
+  template:
+    metadata:
+      labels:
+        app: sms-backend
+        component: api
+    spec:
+      initContainers:
+      - name: migrate-database
+        image: ghcr.io/your-org/sms-backend:latest
+        command: ['npx', 'prisma', 'migrate', 'deploy']
+        env:
+        - name: DATABASE_URL
+          valueFrom:
+            secretKeyRef:
+              name: sms-backend-secrets
+              key: DATABASE_URL
+      containers:
+      - name: backend
+        image: ghcr.io/your-org/sms-backend:latest
+        ports:
+        - containerPort: 3001
+        env:
+        - name: NODE_ENV
+          valueFrom:
+            configMapKeyRef:
+              name: sms-backend-config
+              key: NODE_ENV
+        - name: PORT
+          valueFrom:
+            configMapKeyRef:
+              name: sms-backend-config
+              key: PORT
+        - name: API_PREFIX
+          valueFrom:
+            configMapKeyRef:
+              name: sms-backend-config
+              key: API_PREFIX
+        - name: API_VERSION
+          valueFrom:
+            configMapKeyRef:
+              name: sms-backend-config
+              key: API_VERSION
+        - name: CORS_ORIGIN
+          valueFrom:
+            configMapKeyRef:
+              name: sms-backend-config
+              key: CORS_ORIGIN
+        - name: RATE_LIMIT_WINDOW_MS
+          valueFrom:
+            configMapKeyRef:
+              name: sms-backend-config
+              key: RATE_LIMIT_WINDOW_MS
+        - name: RATE_LIMIT_MAX_REQUESTS
+          valueFrom:
+            configMapKeyRef:
+              name: sms-backend-config
+              key: RATE_LIMIT_MAX_REQUESTS
+        - name: LOG_LEVEL
+          valueFrom:
+            configMapKeyRef:
+              name: sms-backend-config
+              key: LOG_LEVEL
+        - name: REDIS_URL
+          valueFrom:
+            configMapKeyRef:
+              name: sms-backend-config
+              key: REDIS_URL
+        - name: DATABASE_URL
+          valueFrom:
+            secretKeyRef:
+              name: sms-backend-secrets
+              key: DATABASE_URL
+        - name: JWT_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: sms-backend-secrets
+              key: JWT_SECRET
+        - name: ENCRYPTION_KEY
+          valueFrom:
+            secretKeyRef:
+              name: sms-backend-secrets
+              key: ENCRYPTION_KEY
+        - name: STRIPE_SECRET_KEY
+          valueFrom:
+            secretKeyRef:
+              name: sms-payment-secrets
+              key: STRIPE_SECRET_KEY
+        - name: STRIPE_WEBHOOK_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: sms-payment-secrets
+              key: STRIPE_WEBHOOK_SECRET
+        - name: PAYPAL_CLIENT_ID
+          valueFrom:
+            secretKeyRef:
+              name: sms-payment-secrets
+              key: PAYPAL_CLIENT_ID
+        - name: PAYPAL_CLIENT_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: sms-payment-secrets
+              key: PAYPAL_CLIENT_SECRET
+        - name: SMTP_HOST
+          valueFrom:
+            secretKeyRef:
+              name: sms-email-secrets
+              key: SMTP_HOST
+        - name: SMTP_PORT
+          valueFrom:
+            secretKeyRef:
+              name: sms-email-secrets
+              key: SMTP_PORT
+        - name: SMTP_USER
+          valueFrom:
+            secretKeyRef:
+              name: sms-email-secrets
+              key: SMTP_USER
+        - name: SMTP_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: sms-email-secrets
+              key: SMTP_PASSWORD
+        volumeMounts:
+        - name: uploads-storage
+          mountPath: /app/uploads
+        - name: logs-storage
+          mountPath: /app/logs
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "250m"
+          limits:
+            memory: "1Gi"
+            cpu: "500m"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 3001
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 3001
+          initialDelaySeconds: 5
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 3
+      volumes:
+      - name: uploads-storage
+        persistentVolumeClaim:
+          claimName: uploads-pvc
+      - name: logs-storage
+        persistentVolumeClaim:
+          claimName: logs-pvc
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: uploads-pvc
+  namespace: sms-production
+spec:
+  accessModes:
+    - ReadWriteMany
+  resources:
+    requests:
+      storage: 50Gi
+  storageClassName: shared-storage
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: logs-pvc
+  namespace: sms-production
+spec:
+  accessModes:
+    - ReadWriteMany
+  resources:
+    requests:
+      storage: 10Gi
+  storageClassName: shared-storage
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: sms-backend
+  namespace: sms-production
+  labels:
+    app: sms-backend
+    component: api
+spec:
+  type: ClusterIP
+  ports:
+  - port: 3001
+    targetPort: 3001
+    protocol: TCP
+  selector:
+    app: sms-backend
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: sms-backend-hpa
+  namespace: sms-production
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: sms-backend
+  minReplicas: 3
+  maxReplicas: 10
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 70
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 80

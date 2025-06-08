@@ -1,0 +1,43 @@
+{
+  "name": "sms-e2e-tests",
+  "version": "1.0.0",
+  "description": "End-to-end tests for SMS Management System",
+  "private": true,
+  "scripts": {
+    "test": "playwright test",
+    "test:headed": "playwright test --headed",
+    "test:debug": "playwright test --debug",
+    "test:ui": "playwright test --ui",
+    "test:report": "playwright show-report",
+    "test:docker": "docker-compose -f ../docker-compose.test.yml up -d && npm run test && docker-compose -f ../docker-compose.test.yml down",
+    "test:security": "npm run test:security:auth && npm run test:security:permissions && npm run test:security:injection",
+    "test:security:auth": "playwright test tests/security/authentication.spec.ts",
+    "test:security:permissions": "playwright test tests/security/permissions.spec.ts",
+    "test:security:injection": "playwright test tests/security/injection.spec.ts",
+    "test:performance": "playwright test tests/performance/",
+    "test:accessibility": "playwright test tests/accessibility/",
+    "test:mobile": "playwright test tests/mobile/",
+    "test:api": "newman run postman/SMS-API-Tests.json -e postman/environments/test.json",
+    "test:load": "k6 run load-tests/basic-load-test.js",
+    "test:stress": "k6 run load-tests/stress-test.js",
+    "install:browsers": "playwright install",
+    "install:deps": "playwright install-deps"
+  },
+  "dependencies": {
+    "@playwright/test": "^1.40.1",
+    "@axe-core/playwright": "^4.8.2",
+    "newman": "^6.0.0",
+    "k6": "^0.47.0",
+    "dotenv": "^16.3.1",
+    "faker": "^6.6.6",
+    "moment": "^2.29.4"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.4",
+    "typescript": "^5.3.3"
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=8.0.0"
+  }
+}

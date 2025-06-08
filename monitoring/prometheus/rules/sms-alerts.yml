@@ -1,0 +1,200 @@
+groups:
+  - name: sms-backend-alerts
+    rules:
+      - alert: SMSBackendDown
+        expr: up{job="sms-backend"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          service: sms-backend
+        annotations:
+          summary: "SMS Backend service is down"
+          description: "SMS Backend service has been down for more than 1 minute"
+
+      - alert: SMSBackendHighErrorRate
+        expr: rate(http_requests_total{job="sms-backend",status=~"5.."}[5m]) > 0.1
+        for: 5m
+        labels:
+          severity: warning
+          service: sms-backend
+        annotations:
+          summary: "High error rate in SMS Backend"
+          description: "SMS Backend error rate is {{ $value }} errors per second"
+
+      - alert: SMSBackendHighLatency
+        expr: histogram_quantile(0.95, rate(http_request_duration_seconds_bucket{job="sms-backend"}[5m])) > 1
+        for: 5m
+        labels:
+          severity: warning
+          service: sms-backend
+        annotations:
+          summary: "High latency in SMS Backend"
+          description: "95th percentile latency is {{ $value }}s"
+
+      - alert: SMSBackendHighMemoryUsage
+        expr: (container_memory_usage_bytes{pod=~"sms-backend-.*"} / container_spec_memory_limit_bytes) > 0.9
+        for: 5m
+        labels:
+          severity: warning
+          service: sms-backend
+        annotations:
+          summary: "High memory usage in SMS Backend"
+          description: "Memory usage is {{ $value | humanizePercentage }}"
+
+      - alert: SMSBackendHighCPUUsage
+        expr: rate(container_cpu_usage_seconds_total{pod=~"sms-backend-.*"}[5m]) > 0.8
+        for: 5m
+        labels:
+          severity: warning
+          service: sms-backend
+        annotations:
+          summary: "High CPU usage in SMS Backend"
+          description: "CPU usage is {{ $value | humanizePercentage }}"
+
+  - name: sms-database-alerts
+    rules:
+      - alert: PostgreSQLDown
+        expr: up{job="postgres"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          service: postgresql
+        annotations:
+          summary: "PostgreSQL is down"
+          description: "PostgreSQL database has been down for more than 1 minute"
+
+      - alert: PostgreSQLHighConnections
+        expr: pg_stat_database_numbackends / pg_settings_max_connections > 0.8
+        for: 5m
+        labels:
+          severity: warning
+          service: postgresql
+        annotations:
+          summary: "High number of PostgreSQL connections"
+          description: "PostgreSQL connection usage is {{ $value | humanizePercentage }}"
+
+      - alert: PostgreSQLSlowQueries
+        expr: rate(pg_stat_database_tup_returned[5m]) / rate(pg_stat_database_tup_fetched[5m]) < 0.1
+        for: 5m
+        labels:
+          severity: warning
+          service: postgresql
+        annotations:
+          summary: "PostgreSQL slow queries detected"
+          description: "Query efficiency is {{ $value | humanizePercentage }}"
+
+      - alert: RedisDown
+        expr: up{job="redis"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          service: redis
+        annotations:
+          summary: "Redis is down"
+          description: "Redis cache has been down for more than 1 minute"
+
+      - alert: RedisHighMemoryUsage
+        expr: redis_memory_used_bytes / redis_memory_max_bytes > 0.9
+        for: 5m
+        labels:
+          severity: warning
+          service: redis
+        annotations:
+          summary: "High Redis memory usage"
+          description: "Redis memory usage is {{ $value | humanizePercentage }}"
+
+  - name: sms-security-alerts
+    rules:
+      - alert: SMSHighFailedLogins
+        expr: rate(sms_failed_login_attempts_total[5m]) > 10
+        for: 2m
+        labels:
+          severity: warning
+          service: sms-security
+        annotations:
+          summary: "High number of failed login attempts"
+          description: "{{ $value }} failed login attempts per second"
+
+      - alert: SMSUnauthorizedAccess
+        expr: rate(http_requests_total{job="sms-backend",status="401"}[5m]) > 5
+        for: 2m
+        labels:
+          severity: warning
+          service: sms-security
+        annotations:
+          summary: "High number of unauthorized access attempts"
+          description: "{{ $value }} unauthorized requests per second"
+
+      - alert: SMSSuspiciousActivity
+        expr: rate(sms_security_events_total{type="suspicious"}[5m]) > 1
+        for: 1m
+        labels:
+          severity: critical
+          service: sms-security
+        annotations:
+          summary: "Suspicious security activity detected"
+          description: "{{ $value }} suspicious events per second"
+
+  - name: sms-business-alerts
+    rules:
+      - alert: SMSDocumentExpiryAlert
+        expr: sms_documents_expiring_soon > 10
+        for: 1h
+        labels:
+          severity: warning
+          service: sms-business
+        annotations:
+          summary: "Multiple documents expiring soon"
+          description: "{{ $value }} documents are expiring within 30 days"
+
+      - alert: SMSIncidentSpikeAlert
+        expr: rate(sms_incidents_created_total[1h]) > 5
+        for: 30m
+        labels:
+          severity: warning
+          service: sms-business
+        annotations:
+          summary: "Spike in incident creation"
+          description: "{{ $value }} incidents created per hour"
+
+      - alert: SMSComplianceAlert
+        expr: sms_compliance_violations_total > 0
+        for: 1m
+        labels:
+          severity: critical
+          service: sms-compliance
+        annotations:
+          summary: "Compliance violations detected"
+          description: "{{ $value }} compliance violations found"
+
+  - name: sms-infrastructure-alerts
+    rules:
+      - alert: KubernetesNodeNotReady
+        expr: kube_node_status_condition{condition="Ready",status="true"} == 0
+        for: 5m
+        labels:
+          severity: critical
+          service: kubernetes
+        annotations:
+          summary: "Kubernetes node not ready"
+          description: "Node {{ $labels.node }} has been not ready for more than 5 minutes"
+
+      - alert: KubernetesPodCrashLooping
+        expr: rate(kube_pod_container_status_restarts_total[15m]) > 0
+        for: 5m
+        labels:
+          severity: warning
+          service: kubernetes
+        annotations:
+          summary: "Pod is crash looping"
+          description: "Pod {{ $labels.namespace }}/{{ $labels.pod }} is crash looping"
+
+      - alert: KubernetesDeploymentReplicasMismatch
+        expr: kube_deployment_spec_replicas != kube_deployment_status_available_replicas
+        for: 5m
+        labels:
+          severity: warning
+          service: kubernetes
+        annotations:
+          summary: "Deployment replicas mismatch"
+          description: "Deployment {{ $labels.namespace }}/{{ $labels.deployment }} has {{ $value }} available replicas, expected {{ $labels.spec_replicas }}"

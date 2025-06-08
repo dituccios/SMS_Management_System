@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: sms-production
+  labels:
+    name: sms-production
+    environment: production
+    app: sms-management
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: sms-monitoring
+  labels:
+    name: sms-monitoring
+    environment: production
+    app: sms-management

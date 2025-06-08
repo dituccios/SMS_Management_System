@@ -1,0 +1,205 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database for Testing
+  postgres-test:
+    image: postgres:15-alpine
+    container_name: sms_postgres_test
+    environment:
+      POSTGRES_DB: sms_test
+      POSTGRES_USER: test_user
+      POSTGRES_PASSWORD: test_password
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_test_data:/var/lib/postgresql/data
+    networks:
+      - sms_test_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U test_user -d sms_test"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Redis for Testing
+  redis-test:
+    image: redis:7-alpine
+    container_name: sms_redis_test
+    ports:
+      - "6380:6379"
+    volumes:
+      - redis_test_data:/data
+    networks:
+      - sms_test_network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Backend API for Testing
+  backend-test:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.test
+    container_name: sms_backend_test
+    environment:
+      NODE_ENV: test
+      DATABASE_URL: postgresql://test_user:test_password@postgres-test:5432/sms_test
+      REDIS_URL: redis://redis-test:6379
+      JWT_SECRET: test-jwt-secret-for-e2e-testing
+      PORT: 3001
+      CORS_ORIGIN: http://frontend-test:3000
+      LOG_LEVEL: error
+    ports:
+      - "3002:3001"
+    depends_on:
+      postgres-test:
+        condition: service_healthy
+      redis-test:
+        condition: service_healthy
+    volumes:
+      - ./backend/uploads:/app/uploads
+      - ./backend/logs:/app/logs
+    networks:
+      - sms_test_network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    command: >
+      sh -c "
+        npx prisma migrate deploy &&
+        npx prisma db seed &&
+        npm start
+      "
+
+  # Frontend Application for Testing
+  frontend-test:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.test
+    container_name: sms_frontend_test
+    environment:
+      REACT_APP_API_URL: http://backend-test:3001/api/v1
+      NODE_ENV: test
+    ports:
+      - "3001:3000"
+    depends_on:
+      backend-test:
+        condition: service_healthy
+    networks:
+      - sms_test_network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Next.js Frontend for Testing
+  frontend-nextjs-test:
+    build:
+      context: ./frontend-nextjs
+      dockerfile: Dockerfile.test
+    container_name: sms_frontend_nextjs_test
+    environment:
+      NEXT_PUBLIC_API_URL: http://backend-test:3001/api/v1
+      NODE_ENV: test
+    ports:
+      - "3003:3000"
+    depends_on:
+      backend-test:
+        condition: service_healthy
+    networks:
+      - sms_test_network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Monitoring Stack for Testing
+  prometheus-test:
+    image: prom/prometheus:latest
+    container_name: sms_prometheus_test
+    ports:
+      - "9091:9090"
+    volumes:
+      - ./monitoring/prometheus/prometheus.test.yml:/etc/prometheus/prometheus.yml
+      - prometheus_test_data:/prometheus
+    networks:
+      - sms_test_network
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--storage.tsdb.retention.time=200h'
+      - '--web.enable-lifecycle'
+
+  grafana-test:
+    image: grafana/grafana:latest
+    container_name: sms_grafana_test
+    ports:
+      - "3001:3000"
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: test_admin
+    volumes:
+      - grafana_test_data:/var/lib/grafana
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning
+    networks:
+      - sms_test_network
+
+  # ELK Stack for Testing
+  elasticsearch-test:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.11.0
+    container_name: sms_elasticsearch_test
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+    ports:
+      - "9201:9200"
+    volumes:
+      - elasticsearch_test_data:/usr/share/elasticsearch/data
+    networks:
+      - sms_test_network
+
+  logstash-test:
+    image: docker.elastic.co/logstash/logstash:8.11.0
+    container_name: sms_logstash_test
+    volumes:
+      - ./monitoring/logstash/pipeline:/usr/share/logstash/pipeline
+      - ./monitoring/logstash/config/logstash.yml:/usr/share/logstash/config/logstash.yml
+    ports:
+      - "5045:5044"
+    environment:
+      LS_JAVA_OPTS: "-Xmx256m -Xms256m"
+    networks:
+      - sms_test_network
+    depends_on:
+      - elasticsearch-test
+
+  kibana-test:
+    image: docker.elastic.co/kibana/kibana:8.11.0
+    container_name: sms_kibana_test
+    ports:
+      - "5602:5601"
+    environment:
+      ELASTICSEARCH_HOSTS: http://elasticsearch-test:9200
+    networks:
+      - sms_test_network
+    depends_on:
+      - elasticsearch-test
+
+volumes:
+  postgres_test_data:
+  redis_test_data:
+  prometheus_test_data:
+  grafana_test_data:
+  elasticsearch_test_data:
+
+networks:
+  sms_test_network:
+    driver: bridge

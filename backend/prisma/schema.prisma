@@ -1,0 +1,2461 @@
+// SMS Management System Database Schema
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// User Management
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  password  String
+  firstName String
+  lastName  String
+  role      UserRole @default(USER)
+  isActive  Boolean  @default(true)
+  lastLogin DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  companyId String?
+  company   Company? @relation(fields: [companyId], references: [id])
+
+  // SMS-specific relations
+  documents         SMSDocument[]
+  workflows         SMSWorkflow[]
+  workflowTasks     SMSWorkflowTask[]
+  reviews           SMSReview[]
+  reviewComments    SMSReviewComment[]
+  auditLogs         SMSAuditLog[]
+  incidents         SMSIncident[]
+  trainings         SMSTraining[]
+  riskAssessments   SMSRiskAssessment[]
+
+  // PersonaManagement relation
+  personaProfile    PersonaProfile?
+
+  @@map("users")
+}
+
+model Company {
+  id       String      @id @default(cuid())
+  name     String
+  industry String
+  size     CompanySize @default(MEDIUM)
+  country  String
+
+  // Users
+  users User[]
+
+  // SMS-specific relationships
+  smsDocuments    SMSDocument[] @relation("SMSDocuments")
+  workflows       SMSWorkflow[]
+  incidents       SMSIncident[]
+  trainings       SMSTraining[]
+  riskAssessments SMSRiskAssessment[]
+
+  // PersonaManagement relationships
+  personaProfiles     PersonaProfile[]
+  trainingRecords     TrainingRecord[]
+  certifications      Certification[]
+  personaCompetencies PersonaCompetency[]
+
+  // GDPR relationships
+  consentRecords      GDPRConsentRecord[]
+  dataExports         GDPRDataExport[]
+  dataAnonymizations  DataAnonymization[]
+
+  // Dynamic Field Management relationships
+  fieldDefinitions    FieldDefinition[]
+  fieldValues         FieldValue[]
+  formTemplates       FormTemplate[]
+  formSubmissions     FormSubmission[]
+  systemConfigurations SystemConfiguration[]
+  integrations        Integration[]
+
+  // Document Management relationships
+  documentCategories  DocumentCategoryModel[]
+  documentTypes       DocumentTypeModel[]
+  documents           Document[]
+  documentWorkflows   DocumentWorkflow[]
+  documentRetentionPolicies DocumentRetentionPolicy[]
+
+  // Audit Trail and Compliance relationships
+  auditEvents         AuditEvent[]
+  auditSessions       AuditSession[]
+  auditRetentionPolicies AuditRetentionPolicy[]
+  auditCompliance     AuditCompliance[]
+  auditAlerts         AuditAlert[]
+
+  // Subscription and payment relationships
+  subscription    Subscription?
+  paymentMethods  PaymentMethod[]
+  refundRequests  RefundRequest[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("companies")
+}
+
+// SMS Document Management
+model SMSDocument {
+  id          String            @id @default(cuid())
+  title       String
+  description String?
+  content     String?
+  version     String            @default("1.0")
+  status      DocumentStatus    @default(DRAFT)
+  category    DocumentCategory
+  type        DocumentType
+  filePath    String?
+  fileSize    Int?
+  mimeType    String?
+
+  // Metadata
+  tags        String[]
+  metadata    Json?
+
+  // Relationships
+  companyId   String
+  company     Company @relation("SMSDocuments", fields: [companyId], references: [id])
+
+  authorId    String
+  author      User    @relation(fields: [authorId], references: [id])
+
+  // Document lifecycle
+  versions    SMSDocumentVersion[]
+  reviews     SMSReview[]
+  workflows   SMSWorkflowInstance[]
+
+  // Compliance and expiration
+  expiresAt   DateTime?
+  reviewDate  DateTime?
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("sms_documents")
+}
+
+model SMSDocumentVersion {
+  id         String   @id @default(cuid())
+  version    String
+  content    String?
+  filePath   String?
+  changeLog  String?
+
+  documentId String
+  document   SMSDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  createdAt  DateTime @default(now())
+
+  @@map("sms_document_versions")
+}
+
+// SMS Workflow Management
+model SMSWorkflow {
+  id          String        @id @default(cuid())
+  name        String
+  description String?
+  category    String
+  steps       Json          // Workflow definition
+  isActive    Boolean       @default(true)
+
+  companyId   String
+  company     Company       @relation(fields: [companyId], references: [id])
+
+  createdById String
+  createdBy   User          @relation(fields: [createdById], references: [id])
+
+  instances   SMSWorkflowInstance[]
+  formTemplates FormTemplate[]
+
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  @@map("sms_workflows")
+}
+
+model SMSWorkflowInstance {
+  id         String              @id @default(cuid())
+  status     WorkflowStatus      @default(PENDING)
+  currentStep Int                @default(0)
+  data       Json?               // Instance-specific data
+
+  workflowId String
+  workflow   SMSWorkflow         @relation(fields: [workflowId], references: [id])
+
+  documentId String?
+  document   SMSDocument?        @relation(fields: [documentId], references: [id])
+
+  tasks      SMSWorkflowTask[]
+  formSubmissions FormSubmission[]
+
+  startedAt  DateTime            @default(now())
+  completedAt DateTime?
+
+  createdAt  DateTime            @default(now())
+  updatedAt  DateTime            @updatedAt
+
+  @@map("sms_workflow_instances")
+}
+
+model SMSWorkflowTask {
+  id          String              @id @default(cuid())
+  name        String
+  description String?
+  status      TaskStatus          @default(PENDING)
+  dueDate     DateTime?
+  completedAt DateTime?
+  comments    String?
+
+  instanceId  String
+  instance    SMSWorkflowInstance @relation(fields: [instanceId], references: [id], onDelete: Cascade)
+
+  assigneeId  String?
+  assignee    User?               @relation(fields: [assigneeId], references: [id])
+
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
+
+  @@map("sms_workflow_tasks")
+}
+
+// SMS Review System
+model SMSReview {
+  id         String            @id @default(cuid())
+  status     ReviewStatus      @default(PENDING)
+  priority   ReviewPriority    @default(MEDIUM)
+  dueDate    DateTime?
+  completedAt DateTime?
+
+  documentId String
+  document   SMSDocument       @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  reviewerId String
+  reviewer   User              @relation(fields: [reviewerId], references: [id])
+
+  comments   SMSReviewComment[]
+
+  createdAt  DateTime          @default(now())
+  updatedAt  DateTime          @updatedAt
+
+  @@map("sms_reviews")
+}
+
+model SMSReviewComment {
+  id       String   @id @default(cuid())
+  content  String
+  type     CommentType @default(GENERAL)
+
+  reviewId String
+  review   SMSReview @relation(fields: [reviewId], references: [id], onDelete: Cascade)
+
+  authorId String
+  author   User      @relation(fields: [authorId], references: [id])
+
+  createdAt DateTime @default(now())
+
+  @@map("sms_review_comments")
+}
+
+// SMS Audit System
+model SMSAuditLog {
+  id        String   @id @default(cuid())
+  action    String
+  entity    String
+  entityId  String
+  oldValues Json?
+  newValues Json?
+  ipAddress String?
+  userAgent String?
+
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id])
+
+  createdAt DateTime @default(now())
+
+  @@map("sms_audit_logs")
+}
+
+// SMS Incident Management
+model SMSIncident {
+  id          String         @id @default(cuid())
+  title       String
+  description String
+  severity    IncidentSeverity
+  status      IncidentStatus @default(OPEN)
+  category    String
+  location    String?
+
+  reportedAt  DateTime       @default(now())
+  resolvedAt  DateTime?
+
+  companyId   String
+  company     Company        @relation(fields: [companyId], references: [id])
+
+  reporterId  String
+  reporter    User           @relation(fields: [reporterId], references: [id])
+
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+
+  @@map("sms_incidents")
+}
+
+// SMS Training Management
+model SMSTraining {
+  id          String            @id @default(cuid())
+  title       String
+  description String?
+  category    String
+  duration    Int?              // Duration in minutes
+  status      SMSTrainingStatus @default(ACTIVE)
+
+  companyId   String
+  company     Company           @relation(fields: [companyId], references: [id])
+
+  createdById String
+  createdBy   User              @relation(fields: [createdById], references: [id])
+
+  // PersonaManagement relationships
+  trainingRecords TrainingRecord[]
+
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+
+  @@map("sms_trainings")
+}
+
+// SMS Risk Assessment
+model SMSRiskAssessment {
+  id          String     @id @default(cuid())
+  title       String
+  description String?
+  riskLevel   RiskLevel
+  probability Float      // 0-1
+  impact      Float      // 0-1
+  mitigation  String?
+
+  companyId   String
+  company     Company    @relation(fields: [companyId], references: [id])
+
+  assessorId  String
+  assessor    User       @relation(fields: [assessorId], references: [id])
+
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  @@map("sms_risk_assessments")
+}
+
+// Enums
+enum UserRole {
+  OWNER
+  ADMIN
+  USER
+  VIEWER
+}
+
+enum CompanySize {
+  SMALL
+  MEDIUM
+  LARGE
+  ENTERPRISE
+}
+
+enum DocumentStatus {
+  DRAFT
+  UNDER_REVIEW
+  APPROVED
+  ARCHIVED
+  EXPIRED
+}
+
+enum DocumentCategory {
+  POLICY
+  PROCEDURE
+  WORK_INSTRUCTION
+  FORM
+  RECORD
+  MANUAL
+  CERTIFICATE
+  OTHER
+}
+
+enum DocumentType {
+  SAFETY_POLICY
+  EMERGENCY_PROCEDURE
+  TRAINING_MATERIAL
+  INCIDENT_REPORT
+  AUDIT_REPORT
+  RISK_ASSESSMENT
+  COMPLIANCE_DOCUMENT
+  OTHER
+}
+
+enum WorkflowStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+  FAILED
+}
+
+enum TaskStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+  OVERDUE
+}
+
+enum ReviewStatus {
+  PENDING
+  IN_PROGRESS
+  APPROVED
+  REJECTED
+  CANCELLED
+}
+
+enum ReviewPriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+enum CommentType {
+  GENERAL
+  SUGGESTION
+  ISSUE
+  APPROVAL
+  REJECTION
+}
+
+enum IncidentSeverity {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum IncidentStatus {
+  OPEN
+  INVESTIGATING
+  RESOLVED
+  CLOSED
+}
+
+enum SMSTrainingStatus {
+  ACTIVE
+  INACTIVE
+  ARCHIVED
+}
+
+enum RiskLevel {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+// PersonaManagement Enums
+enum EmploymentType {
+  FULL_TIME
+  PART_TIME
+  CONTRACT
+  TEMPORARY
+  INTERN
+  CONSULTANT
+}
+
+enum PersonaStatus {
+  ACTIVE
+  INACTIVE
+  SUSPENDED
+  TERMINATED
+  ON_LEAVE
+}
+
+enum TrainingStatus {
+  ENROLLED
+  IN_PROGRESS
+  COMPLETED
+  FAILED
+  EXPIRED
+  CANCELLED
+  OVERDUE
+}
+
+enum ComplianceStatus {
+  COMPLIANT
+  NON_COMPLIANT
+  PENDING
+  OVERDUE
+  EXEMPT
+}
+
+enum CertificationType {
+  PROFESSIONAL
+  REGULATORY
+  INTERNAL
+  VENDOR
+  ACADEMIC
+}
+
+enum CertificationStatus {
+  ACTIVE
+  EXPIRED
+  SUSPENDED
+  REVOKED
+  PENDING_RENEWAL
+}
+
+enum ComplianceLevel {
+  BASIC
+  STANDARD
+  ADVANCED
+  CRITICAL
+}
+
+enum CompetencyType {
+  SKILL
+  KNOWLEDGE
+  BEHAVIOR
+  CERTIFICATION
+}
+
+enum CompetencyLevel {
+  BEGINNER
+  INTERMEDIATE
+  ADVANCED
+  EXPERT
+  MASTER
+}
+
+enum CompetencyStatus {
+  ACTIVE
+  INACTIVE
+  UNDER_DEVELOPMENT
+  VALIDATED
+  EXPIRED
+}
+
+enum Priority {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum ConsentType {
+  DATA_PROCESSING
+  MARKETING
+  ANALYTICS
+  COOKIES
+  THIRD_PARTY_SHARING
+  PROFILING
+}
+
+enum ConsentStatus {
+  GRANTED
+  WITHDRAWN
+  EXPIRED
+  PENDING
+}
+
+// GDPR-Compliant PersonaManagement Models
+model PersonaProfile {
+  id                String            @id @default(cuid())
+
+  // Basic Information (encrypted)
+  employeeId        String?           @unique
+  firstName         String            // Encrypted in application layer
+  lastName          String            // Encrypted in application layer
+  email             String            @unique // Encrypted in application layer
+  phoneNumber       String?           // Encrypted in application layer
+
+  // Personal Details (encrypted)
+  dateOfBirth       DateTime?         // Encrypted in application layer
+  nationalId        String?           // Encrypted in application layer
+  address           Json?             // Encrypted address object
+  emergencyContact  Json?             // Encrypted emergency contact info
+
+  // Employment Information
+  department        String?
+  position          String?
+  employmentType    EmploymentType    @default(FULL_TIME)
+  startDate         DateTime?
+  endDate           DateTime?
+  managerId         String?
+  manager           PersonaProfile?   @relation("ManagerSubordinate", fields: [managerId], references: [id])
+  subordinates      PersonaProfile[]  @relation("ManagerSubordinate")
+
+  // Status and Metadata
+  status            PersonaStatus     @default(ACTIVE)
+  isActive          Boolean           @default(true)
+  lastLogin         DateTime?
+  profileCompleteness Float           @default(0.0)
+
+  // GDPR Compliance Fields
+  dataProcessingConsent Boolean       @default(false)
+  marketingConsent      Boolean       @default(false)
+  consentTimestamp      DateTime?
+  consentVersion        String?
+  dataRetentionUntil    DateTime?
+  pseudonymizationKey   String?       // For pseudonymization
+  anonymizationDate     DateTime?
+
+  // Audit Fields
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+  createdBy         String?
+  updatedBy         String?
+
+  // Relationships
+  companyId         String
+  company           Company           @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  userId            String?           @unique
+  user              User?             @relation(fields: [userId], references: [id])
+
+  // Training and Certification relationships
+  trainingRecords   TrainingRecord[]
+  certifications    Certification[]
+  competencies      PersonaCompetency[]
+
+  // GDPR related relationships
+  consentRecords    GDPRConsentRecord[]
+  dataExports       GDPRDataExport[]
+
+  @@map("persona_profiles")
+  @@index([companyId, status])
+  @@index([email])
+  @@index([employeeId])
+}
+
+model TrainingRecord {
+  id                String            @id @default(cuid())
+
+  // Training Information
+  trainingId        String
+  training          SMSTraining       @relation(fields: [trainingId], references: [id])
+
+  personaId         String
+  persona           PersonaProfile    @relation(fields: [personaId], references: [id], onDelete: Cascade)
+
+  // Training Details
+  enrollmentDate    DateTime          @default(now())
+  startDate         DateTime?
+  completionDate    DateTime?
+  expiryDate        DateTime?
+
+  // Progress and Results
+  status            TrainingStatus    @default(ENROLLED)
+  progress          Float             @default(0.0) // 0-100%
+  score             Float?            // Final score
+  passingScore      Float?            // Required passing score
+  attempts          Int               @default(0)
+  maxAttempts       Int?
+
+  // Certification Information
+  certificateNumber String?           @unique
+  certificateUrl    String?           // URL to certificate file
+  issuedBy          String?           // Issuing authority
+
+  // Compliance and Tracking
+  isRequired        Boolean           @default(false)
+  complianceStatus  ComplianceStatus  @default(PENDING)
+  remindersSent     Int               @default(0)
+  lastReminderDate  DateTime?
+
+  // Metadata
+  metadata          Json?             // Additional training-specific data
+  notes             String?
+
+  // Audit Fields
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+  createdBy         String?
+  updatedBy         String?
+
+  // Relationships
+  companyId         String
+  company           Company           @relation(fields: [companyId], references: [id])
+
+  certificationId   String?
+  certification     Certification?    @relation("CertificationTraining", fields: [certificationId], references: [id])
+
+  @@map("training_records")
+  @@unique([personaId, trainingId])
+  @@index([companyId, status])
+  @@index([expiryDate])
+  @@index([complianceStatus])
+}
+
+model Certification {
+  id                String            @id @default(cuid())
+
+  // Certification Information
+  name              String
+  description       String?
+  type              CertificationType
+  category          String?           // e.g., "Safety", "Technical", "Compliance"
+
+  // Issuing Authority
+  issuingAuthority  String
+  authorityUrl      String?
+  accreditationBody String?
+
+  // Certification Details
+  certificateNumber String            @unique
+  issueDate         DateTime
+  expiryDate        DateTime?
+  validityPeriod    Int?              // Validity period in months
+
+  // Requirements and Prerequisites
+  prerequisites     Json?             // Array of prerequisite certifications
+  requirements      Json?             // Requirements to obtain certification
+  renewalRequirements Json?           // Requirements for renewal
+
+  // Status and Compliance
+  status            CertificationStatus @default(ACTIVE)
+  complianceLevel   ComplianceLevel   @default(STANDARD)
+  isRegulatory      Boolean           @default(false)
+
+  // File Attachments
+  certificateUrl    String?           // URL to certificate file
+  attachments       Json?             // Array of attachment URLs
+
+  // Metadata
+  metadata          Json?
+  tags              String[]
+
+  // Audit Fields
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+  createdBy         String?
+  updatedBy         String?
+
+  // Relationships
+  personaId         String
+  persona           PersonaProfile    @relation(fields: [personaId], references: [id], onDelete: Cascade)
+
+  companyId         String
+  company           Company           @relation(fields: [companyId], references: [id])
+
+  // Related training records
+  trainingRecords   TrainingRecord[]  @relation("CertificationTraining")
+
+  @@map("certifications")
+  @@index([companyId, status])
+  @@index([expiryDate])
+  @@index([type, category])
+}
+
+model PersonaCompetency {
+  id                String            @id @default(cuid())
+
+  // Competency Information
+  name              String
+  description       String?
+  category          String            // e.g., "Technical", "Soft Skills", "Safety"
+  type              CompetencyType    @default(SKILL)
+
+  // Assessment Details
+  currentLevel      CompetencyLevel   @default(BEGINNER)
+  targetLevel       CompetencyLevel?
+  assessmentDate    DateTime?
+  nextAssessmentDate DateTime?
+
+  // Scoring
+  score             Float?            // Current competency score (0-100)
+  maxScore          Float             @default(100)
+  passingScore      Float             @default(70)
+
+  // Evidence and Validation
+  evidenceUrl       String?           // URL to evidence files
+  validatedBy       String?           // Who validated this competency
+  validationDate    DateTime?
+
+  // Development Plan
+  developmentPlan   Json?             // Development activities and timeline
+  trainingRequired  Boolean           @default(false)
+
+  // Status and Tracking
+  status            CompetencyStatus  @default(ACTIVE)
+  priority          Priority          @default(MEDIUM)
+
+  // Metadata
+  metadata          Json?
+  notes             String?
+
+  // Audit Fields
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+  createdBy         String?
+  updatedBy         String?
+
+  // Relationships
+  personaId         String
+  persona           PersonaProfile    @relation(fields: [personaId], references: [id], onDelete: Cascade)
+
+  companyId         String
+  company           Company           @relation(fields: [companyId], references: [id])
+
+  @@map("persona_competencies")
+  @@unique([personaId, name, category])
+  @@index([companyId, status])
+  @@index([currentLevel, targetLevel])
+}
+
+// GDPR Consent Management Models
+model GDPRConsentRecord {
+  id                String            @id @default(cuid())
+
+  // Consent Information
+  consentType       ConsentType
+  status            ConsentStatus     @default(PENDING)
+  version           String            @default("1.0")
+
+  // Consent Details
+  purpose           String            // Purpose of data processing
+  legalBasis        String            // Legal basis for processing
+  dataCategories    String[]          // Categories of personal data
+  retentionPeriod   Int?              // Retention period in days
+
+  // Consent Lifecycle
+  grantedAt         DateTime?
+  withdrawnAt       DateTime?
+  expiresAt         DateTime?
+  lastUpdated       DateTime          @default(now())
+
+  // Consent Capture Details
+  consentMethod     String?           // How consent was captured
+  ipAddress         String?           // IP address when consent was given
+  userAgent         String?           // User agent when consent was given
+  consentText       String?           // Exact consent text shown to user
+
+  // Processing Details
+  thirdParties      Json?             // Third parties data is shared with
+  transferCountries String[]          // Countries data is transferred to
+  automatedDecision Boolean           @default(false)
+
+  // Metadata
+  metadata          Json?
+  notes             String?
+
+  // Audit Fields
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+  createdBy         String?
+  updatedBy         String?
+
+  // Relationships
+  personaId         String
+  persona           PersonaProfile    @relation(fields: [personaId], references: [id], onDelete: Cascade)
+
+  companyId         String
+  company           Company           @relation(fields: [companyId], references: [id])
+
+  @@map("gdpr_consent_records")
+  @@index([personaId, consentType])
+  @@index([companyId, status])
+  @@index([expiresAt])
+}
+
+model GDPRDataExport {
+  id                String            @id @default(cuid())
+
+  // Export Information
+  requestId         String            @unique
+  status            ExportStatus      @default(PENDING)
+  format            ExportFormat      @default(JSON)
+
+  // Export Details
+  dataCategories    String[]          // Categories of data exported
+  dateRange         Json?             // Date range for export
+  includeDeleted    Boolean           @default(false)
+
+  // File Information
+  fileName          String?
+  fileSize          BigInt?           // File size in bytes
+  fileUrl           String?           // URL to download file
+  downloadCount     Int               @default(0)
+
+  // Security
+  encryptionKey     String?           // Encryption key for file
+  checksum          String?           // File integrity checksum
+  expiresAt         DateTime?         // When download link expires
+
+  // Processing Details
+  requestedAt       DateTime          @default(now())
+  processedAt       DateTime?
+  completedAt       DateTime?
+  downloadedAt      DateTime?
+
+  // Error Handling
+  errorMessage      String?
+  retryCount        Int               @default(0)
+
+  // Metadata
+  metadata          Json?
+
+  // Audit Fields
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+  createdBy         String?
+
+  // Relationships
+  personaId         String
+  persona           PersonaProfile    @relation(fields: [personaId], references: [id], onDelete: Cascade)
+
+  companyId         String
+  company           Company           @relation(fields: [companyId], references: [id])
+
+  @@map("gdpr_data_exports")
+  @@index([personaId, status])
+  @@index([companyId, requestedAt])
+  @@index([expiresAt])
+}
+
+model DataAnonymization {
+  id                String            @id @default(cuid())
+
+  // Anonymization Information
+  originalPersonaId String            // Original persona ID before anonymization
+  anonymizationMethod String          // Method used for anonymization
+  reason            String            // Reason for anonymization
+
+  // Anonymization Details
+  fieldsAnonymized  String[]          // List of fields that were anonymized
+  pseudonymizationKey String?         // Key used for pseudonymization
+  anonymizationDate DateTime          @default(now())
+
+  // Retention Information
+  originalRetentionDate DateTime?     // Original data retention date
+  anonymizedRetentionDate DateTime?   // Anonymized data retention date
+
+  // Verification
+  verificationHash  String?           // Hash to verify anonymization
+  isReversible      Boolean           @default(false)
+
+  // Legal and Compliance
+  legalBasis        String?           // Legal basis for anonymization
+  requestedBy       String?           // Who requested the anonymization
+  approvedBy        String?           // Who approved the anonymization
+
+  // Metadata
+  metadata          Json?
+  notes             String?
+
+  // Audit Fields
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+  createdBy         String?
+
+  // Relationships
+  companyId         String
+  company           Company           @relation(fields: [companyId], references: [id])
+
+  @@map("data_anonymizations")
+  @@index([originalPersonaId])
+  @@index([companyId, anonymizationDate])
+}
+
+enum ExportStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+  EXPIRED
+}
+
+enum ExportFormat {
+  JSON
+  CSV
+  XML
+  PDF
+}
+
+// Subscription and Payment Models
+model Subscription {
+  id                String             @id @default(cuid())
+  planId            String
+  status            SubscriptionStatus @default(TRIAL)
+  currentPeriodStart DateTime
+  currentPeriodEnd   DateTime
+  trialStart        DateTime?
+  trialEnd          DateTime?
+  canceledAt        DateTime?
+  cancelAtPeriodEnd Boolean           @default(false)
+
+  // Pricing
+  amount            Decimal           @db.Decimal(10, 2)
+  currency          String            @default("EUR")
+  interval          BillingInterval   @default(MONTHLY)
+
+  // Usage tracking
+  userCount         Int               @default(0)
+  storageUsed       BigInt            @default(0) // in bytes
+
+  // External IDs
+  stripeSubscriptionId String?        @unique
+  paypalSubscriptionId String?        @unique
+
+  // Relationships
+  companyId         String            @unique
+  company           Company           @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  payments          Payment[]
+  invoices          Invoice[]
+  usageRecords      UsageRecord[]
+
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+
+  @@map("subscriptions")
+}
+
+model Payment {
+  id                String        @id @default(cuid())
+  amount            Decimal       @db.Decimal(10, 2)
+  currency          String        @default("EUR")
+  status            PaymentStatus @default(PENDING)
+  paymentMethodId   String?
+  paymentMethod     PaymentMethod? @relation(fields: [paymentMethodId], references: [id])
+
+  // External payment IDs
+  stripePaymentId   String?       @unique
+  paypalPaymentId   String?       @unique
+  externalPaymentId String?       // For other payment providers
+
+  // Payment details
+  description       String?
+  failureReason     String?
+  refundedAmount    Decimal?      @db.Decimal(10, 2)
+  refundedAt        DateTime?
+
+  // Relationships
+  subscriptionId    String
+  subscription      Subscription  @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+
+  invoiceId         String?
+  invoice           Invoice?      @relation(fields: [invoiceId], references: [id])
+
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+
+  @@map("payments")
+}
+
+model Invoice {
+  id                String        @id @default(cuid())
+  invoiceNumber     String        @unique
+  amount            Decimal       @db.Decimal(10, 2)
+  currency          String        @default("EUR")
+  status            InvoiceStatus @default(DRAFT)
+
+  // Tax information
+  taxAmount         Decimal?      @db.Decimal(10, 2)
+  taxRate           Decimal?      @db.Decimal(5, 4)
+
+  // Billing period
+  periodStart       DateTime
+  periodEnd         DateTime
+
+  // Due dates
+  issuedAt          DateTime      @default(now())
+  dueAt             DateTime
+  paidAt            DateTime?
+
+  // External IDs
+  stripeInvoiceId   String?       @unique
+  paypalInvoiceId   String?       @unique
+
+  // File storage
+  pdfUrl            String?
+
+  // Relationships
+  subscriptionId    String
+  subscription      Subscription  @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+
+  payments          Payment[]
+  invoiceItems      InvoiceItem[]
+
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+
+  @@map("invoices")
+}
+
+model InvoiceItem {
+  id          String  @id @default(cuid())
+  description String
+  quantity    Int     @default(1)
+  unitPrice   Decimal @db.Decimal(10, 2)
+  amount      Decimal @db.Decimal(10, 2)
+
+  // Relationships
+  invoiceId   String
+  invoice     Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+
+  createdAt   DateTime @default(now())
+
+  @@map("invoice_items")
+}
+
+model UsageRecord {
+  id             String    @id @default(cuid())
+  metric         UsageMetric
+  quantity       BigInt
+  timestamp      DateTime  @default(now())
+
+  // Relationships
+  subscriptionId String
+  subscription   Subscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+
+  createdAt      DateTime  @default(now())
+
+  @@map("usage_records")
+}
+
+model PaymentMethod {
+  id                String            @id @default(cuid())
+  type              PaymentMethodType
+  isDefault         Boolean           @default(false)
+
+  // Card details (tokenized)
+  cardLast4         String?
+  cardBrand         String?
+  cardExpMonth      Int?
+  cardExpYear       Int?
+
+  // External IDs
+  stripePaymentMethodId String?       @unique
+  paypalPaymentMethodId String?       @unique
+
+  // Relationships
+  companyId         String
+  company           Company           @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  payments          Payment[]
+
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+
+  @@map("payment_methods")
+}
+
+model RefundRequest {
+  id            String       @id @default(cuid())
+  amount        Decimal      @db.Decimal(10, 2)
+  reason        String
+  status        RefundStatus @default(PENDING)
+  processedAt   DateTime?
+
+  // Relationships
+  paymentId     String
+  companyId     String
+  company       Company      @relation(fields: [companyId], references: [id])
+
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+
+  @@map("refund_requests")
+}
+
+// Subscription Enums
+enum SubscriptionStatus {
+  TRIAL
+  ACTIVE
+  PAST_DUE
+  CANCELED
+  UNPAID
+  INCOMPLETE
+  INCOMPLETE_EXPIRED
+}
+
+enum BillingInterval {
+  MONTHLY
+  YEARLY
+}
+
+enum PaymentStatus {
+  PENDING
+  PROCESSING
+  SUCCEEDED
+  FAILED
+  CANCELED
+  REFUNDED
+  PARTIALLY_REFUNDED
+}
+
+enum PaymentProvider {
+  CREDIT_CARD
+  DEBIT_CARD
+  PAYPAL
+  BANK_TRANSFER
+  SEPA_DEBIT
+  SOFORT
+  IDEAL
+  GIROPAY
+  BANCONTACT
+  ALIPAY
+  WECHAT_PAY
+  PIX
+  BOLETO
+}
+
+enum PaymentMethodType {
+  CARD
+  PAYPAL
+  BANK_ACCOUNT
+  DIGITAL_WALLET
+}
+
+enum InvoiceStatus {
+  DRAFT
+  OPEN
+  PAID
+  VOID
+  UNCOLLECTIBLE
+}
+
+enum UsageMetric {
+  USERS
+  STORAGE_GB
+  API_CALLS
+  DOCUMENTS
+  WORKFLOWS
+}
+
+enum RefundStatus {
+  PENDING
+  APPROVED
+  PROCESSED
+  REJECTED
+}
+
+// ============================================================================
+// SCALABLE FIELD MANAGEMENT SYSTEM
+// ============================================================================
+
+// Dynamic Field Definitions for Scalability
+model FieldDefinition {
+  id                String            @id @default(cuid())
+
+  // Field Identification
+  name              String            // Field name (e.g., "customField1", "emergencyContactPhone")
+  label             String            // Display label (e.g., "Emergency Contact Phone")
+  description       String?           // Field description
+  category          String            // Category (e.g., "personal", "employment", "custom")
+
+  // Field Configuration
+  fieldType         FieldType         // Type of field (TEXT, NUMBER, DATE, etc.)
+  dataType          DataType          // Data type for validation
+  isRequired        Boolean           @default(false)
+  isEncrypted       Boolean           @default(false)
+  isSearchable      Boolean           @default(true)
+  isFilterable      Boolean           @default(true)
+  isSortable        Boolean           @default(true)
+
+  // Validation Rules
+  validationRules   Json?             // JSON object with validation rules
+  defaultValue      String?           // Default value
+  placeholder       String?           // Placeholder text
+  helpText          String?           // Help text for users
+
+  // Display Configuration
+  displayOrder      Int               @default(0)
+  isVisible         Boolean           @default(true)
+  isEditable        Boolean           @default(true)
+  groupName         String?           // Group fields together
+
+  // Options for SELECT, RADIO, CHECKBOX fields
+  options           Json?             // Array of options for select fields
+
+  // Conditional Logic
+  conditionalLogic  Json?             // Rules for showing/hiding fields
+  dependencies      String[]          // Fields this field depends on
+
+  // GDPR and Compliance
+  isPersonalData    Boolean           @default(false)
+  gdprCategory      GDPRDataCategory? // GDPR data category
+  retentionPeriod   Int?              // Retention period in days
+
+  // Audit and Metadata
+  version           String            @default("1.0")
+  isActive          Boolean           @default(true)
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+  createdBy         String?
+  updatedBy         String?
+
+  // Relationships
+  companyId         String?           // Company-specific fields (null for global)
+  company           Company?          @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  // Field values
+  fieldValues       FieldValue[]
+
+  @@map("field_definitions")
+  @@unique([name, companyId])
+  @@index([category, isActive])
+  @@index([fieldType, isActive])
+  @@index([companyId, isActive])
+}
+
+// Dynamic Field Values Storage
+model FieldValue {
+  id                String            @id @default(cuid())
+
+  // Field Reference
+  fieldDefinitionId String
+  fieldDefinition   FieldDefinition   @relation(fields: [fieldDefinitionId], references: [id], onDelete: Cascade)
+
+  // Entity Reference (polymorphic)
+  entityType        EntityType        // Type of entity (PERSONA, TRAINING, CERTIFICATION, etc.)
+  entityId          String            // ID of the entity
+
+  // Value Storage (polymorphic based on field type)
+  textValue         String?           // For TEXT, EMAIL, URL, etc.
+  numberValue       Float?            // For NUMBER, DECIMAL
+  integerValue      Int?              // For INTEGER
+  booleanValue      Boolean?          // For BOOLEAN, CHECKBOX
+  dateValue         DateTime?         // For DATE, DATETIME
+  jsonValue         Json?             // For JSON, ARRAY, OBJECT
+
+  // Encrypted value storage
+  encryptedValue    String?           // For encrypted fields
+  encryptionKey     String?           // Reference to encryption key
+
+  // Metadata
+  isEncrypted       Boolean           @default(false)
+  version           String            @default("1.0")
+
+  // Audit Fields
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+  createdBy         String?
+  updatedBy         String?
+
+  // Relationships
+  companyId         String
+  company           Company           @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@map("field_values")
+  @@unique([fieldDefinitionId, entityType, entityId])
+  @@index([entityType, entityId])
+  @@index([companyId, entityType])
+  @@index([fieldDefinitionId, companyId])
+}
+
+// Form Templates for Dynamic Forms
+model FormTemplate {
+  id                String            @id @default(cuid())
+
+  // Template Information
+  name              String
+  description       String?
+  category          String            // e.g., "personnel", "training", "incident"
+  version           String            @default("1.0")
+
+  // Form Configuration
+  fields            Json              // Array of field configurations
+  layout            Json?             // Layout configuration
+  validationRules   Json?             // Form-level validation rules
+
+  // Workflow Integration
+  workflowId        String?           // Associated workflow
+  workflow          SMSWorkflow?      @relation(fields: [workflowId], references: [id])
+
+  // Status and Metadata
+  isActive          Boolean           @default(true)
+  isPublished       Boolean           @default(false)
+  publishedAt       DateTime?
+
+  // Audit Fields
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+  createdBy         String?
+  updatedBy         String?
+
+  // Relationships
+  companyId         String?           // Company-specific templates (null for global)
+  company           Company?          @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  // Form submissions
+  formSubmissions   FormSubmission[]
+
+  @@map("form_templates")
+  @@index([category, isActive])
+  @@index([companyId, isActive])
+}
+
+// Form Submissions
+model FormSubmission {
+  id                String            @id @default(cuid())
+
+  // Submission Information
+  submissionData    Json              // Complete form data
+  status            SubmissionStatus  @default(SUBMITTED)
+
+  // Processing Information
+  processedAt       DateTime?
+  processedBy       String?
+  processingNotes   String?
+
+  // Validation Results
+  validationErrors  Json?             // Validation errors if any
+  isValid           Boolean           @default(true)
+
+  // Workflow Integration
+  workflowInstanceId String?
+  workflowInstance   SMSWorkflowInstance? @relation(fields: [workflowInstanceId], references: [id])
+
+  // Audit Fields
+  submittedAt       DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+  submittedBy       String?
+
+  // Relationships
+  formTemplateId    String
+  formTemplate      FormTemplate      @relation(fields: [formTemplateId], references: [id])
+
+  companyId         String
+  company           Company           @relation(fields: [companyId], references: [id])
+
+  @@map("form_submissions")
+  @@index([formTemplateId, status])
+  @@index([companyId, submittedAt])
+  @@index([status, submittedAt])
+}
+
+// Configuration Management for Scalability
+model SystemConfiguration {
+  id                String            @id @default(cuid())
+
+  // Configuration Key-Value
+  key               String            @unique
+  value             Json              // Configuration value (can be any type)
+  description       String?           // Description of the configuration
+
+  // Configuration Metadata
+  category          String            // Category (e.g., "system", "ui", "integration")
+  dataType          DataType          // Type of the value
+  isSecret          Boolean           @default(false) // For sensitive configurations
+  isEditable        Boolean           @default(true)  // Can be edited via UI
+
+  // Validation
+  validationRules   Json?             // Validation rules for the value
+  defaultValue      Json?             // Default value
+
+  // Environment and Scope
+  environment       Environment       @default(PRODUCTION)
+  scope             ConfigScope       @default(GLOBAL)
+
+  // Audit Fields
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+  createdBy         String?
+  updatedBy         String?
+
+  // Company-specific configurations
+  companyId         String?
+  company           Company?          @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@map("system_configurations")
+  @@index([category, scope])
+  @@index([companyId, category])
+}
+
+// Integration Management
+model Integration {
+  id                String            @id @default(cuid())
+
+  // Integration Information
+  name              String
+  type              IntegrationType
+  provider          String            // e.g., "salesforce", "slack", "teams"
+  version           String            @default("1.0")
+
+  // Configuration
+  configuration     Json              // Integration-specific configuration
+  credentials       Json?             // Encrypted credentials
+  endpoints         Json?             // API endpoints
+
+  // Status and Health
+  status            IntegrationStatus @default(INACTIVE)
+  isEnabled         Boolean           @default(false)
+  lastSyncAt        DateTime?
+  lastErrorAt       DateTime?
+  lastError         String?
+
+  // Rate Limiting
+  rateLimitConfig   Json?             // Rate limiting configuration
+
+  // Webhook Configuration
+  webhookUrl        String?
+  webhookSecret     String?
+  webhookEvents     String[]          // Events to send via webhook
+
+  // Audit Fields
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+  createdBy         String?
+  updatedBy         String?
+
+  // Relationships
+  companyId         String
+  company           Company           @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  // Integration logs
+  integrationLogs   IntegrationLog[]
+
+  @@map("integrations")
+  @@index([companyId, type])
+  @@index([status, isEnabled])
+}
+
+// Integration Logs
+model IntegrationLog {
+  id                String            @id @default(cuid())
+
+  // Log Information
+  operation         String            // Operation performed
+  direction         LogDirection      // INBOUND or OUTBOUND
+  status            LogStatus         // SUCCESS, ERROR, WARNING
+
+  // Request/Response Data
+  requestData       Json?             // Request payload
+  responseData      Json?             // Response payload
+  errorMessage      String?           // Error message if any
+
+  // Performance Metrics
+  duration          Int?              // Duration in milliseconds
+  retryCount        Int               @default(0)
+
+  // Metadata
+  metadata          Json?             // Additional metadata
+
+  // Audit Fields
+  createdAt         DateTime          @default(now())
+
+  // Relationships
+  integrationId     String
+  integration       Integration       @relation(fields: [integrationId], references: [id], onDelete: Cascade)
+
+  @@map("integration_logs")
+  @@index([integrationId, createdAt])
+  @@index([status, createdAt])
+}
+
+// ============================================================================
+// ENHANCED ENUMS FOR SCALABILITY
+// ============================================================================
+
+enum FieldType {
+  TEXT
+  TEXTAREA
+  EMAIL
+  PASSWORD
+  URL
+  PHONE
+  NUMBER
+  INTEGER
+  DECIMAL
+  BOOLEAN
+  DATE
+  DATETIME
+  TIME
+  SELECT
+  MULTISELECT
+  RADIO
+  CHECKBOX
+  FILE
+  IMAGE
+  JSON
+  ARRAY
+  OBJECT
+  ENCRYPTED_TEXT
+  SIGNATURE
+  LOCATION
+  COLOR
+  RATING
+  SLIDER
+  RICH_TEXT
+  CODE
+  BARCODE
+  QR_CODE
+}
+
+enum DataType {
+  STRING
+  NUMBER
+  INTEGER
+  BOOLEAN
+  DATE
+  DATETIME
+  JSON
+  ARRAY
+  OBJECT
+  BINARY
+  UUID
+  EMAIL
+  URL
+  PHONE
+  ENCRYPTED
+}
+
+enum EntityType {
+  PERSONA
+  TRAINING_RECORD
+  CERTIFICATION
+  COMPETENCY
+  DOCUMENT
+  INCIDENT
+  WORKFLOW
+  WORKFLOW_TASK
+  RISK_ASSESSMENT
+  AUDIT_LOG
+  FORM_SUBMISSION
+  CUSTOM
+}
+
+enum GDPRDataCategory {
+  PERSONAL_IDENTIFIERS
+  CONTACT_INFORMATION
+  DEMOGRAPHIC_DATA
+  EMPLOYMENT_DATA
+  FINANCIAL_DATA
+  HEALTH_DATA
+  BIOMETRIC_DATA
+  BEHAVIORAL_DATA
+  TECHNICAL_DATA
+  USAGE_DATA
+  LOCATION_DATA
+  COMMUNICATION_DATA
+  PREFERENCE_DATA
+  CONSENT_DATA
+}
+
+enum SubmissionStatus {
+  DRAFT
+  SUBMITTED
+  PROCESSING
+  APPROVED
+  REJECTED
+  COMPLETED
+  CANCELLED
+}
+
+enum Environment {
+  DEVELOPMENT
+  STAGING
+  PRODUCTION
+}
+
+enum ConfigScope {
+  GLOBAL
+  COMPANY
+  USER
+  INTEGRATION
+}
+
+enum IntegrationType {
+  CRM
+  ERP
+  HRIS
+  LMS
+  COMMUNICATION
+  STORAGE
+  ANALYTICS
+  SECURITY
+  COMPLIANCE
+  CUSTOM
+  WEBHOOK
+  API
+}
+
+enum IntegrationStatus {
+  ACTIVE
+  INACTIVE
+  ERROR
+  SYNCING
+  PAUSED
+  MAINTENANCE
+}
+
+enum LogDirection {
+  INBOUND
+  OUTBOUND
+  INTERNAL
+}
+
+enum LogStatus {
+  SUCCESS
+  ERROR
+  WARNING
+  INFO
+  DEBUG
+}
+
+// Document Management System Models
+
+model DocumentCategoryModel {
+  id          String @id @default(cuid())
+  name        String
+  description String?
+  parentId    String?
+  parent      DocumentCategoryModel? @relation("CategoryHierarchy", fields: [parentId], references: [id])
+  children    DocumentCategoryModel[] @relation("CategoryHierarchy")
+  path        String // Hierarchical path like "/policies/safety"
+  isActive    Boolean @default(true)
+  sortOrder   Int @default(0)
+
+  // Permissions
+  permissions Json? // Role-based permissions for this category
+
+  // Metadata
+  companyId   String
+  company     Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  createdBy   String?
+  updatedBy   String?
+
+  // Relations
+  documents   Document[]
+
+  @@unique([name, companyId])
+  @@index([companyId, isActive])
+  @@index([parentId])
+  @@map("document_categories")
+}
+
+model DocumentTypeModel {
+  id              String @id @default(cuid())
+  name            String
+  description     String?
+  fileExtensions  String[] // Allowed file extensions
+  maxFileSize     Int? // Maximum file size in bytes
+  isActive        Boolean @default(true)
+
+  // Workflow Configuration
+  requiresApproval Boolean @default(false)
+  approvalWorkflow Json? // Workflow configuration
+  reviewCycle      Int? // Review cycle in days
+  retentionPeriod  Int? // Retention period in days
+
+  // Templates and Forms
+  templateId      String?
+  formFields      Json? // Custom form fields for this document type
+
+  // Metadata
+  companyId       String
+  company         Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  createdBy       String?
+  updatedBy       String?
+
+  // Relations
+  documents       Document[]
+
+  @@unique([name, companyId])
+  @@index([companyId, isActive])
+  @@map("document_types")
+}
+
+model Document {
+  id                String @id @default(cuid())
+  title             String
+  description       String?
+  fileName          String
+  originalFileName  String
+  filePath          String
+  fileSize          Int
+  mimeType          String
+  checksum          String // File integrity verification
+
+  // Classification
+  categoryId        String
+  category          DocumentCategoryModel @relation(fields: [categoryId], references: [id])
+  typeId            String
+  type              DocumentTypeModel @relation(fields: [typeId], references: [id])
+  securityLevel     DocumentSecurityLevel @default(INTERNAL)
+  tags              String[]
+
+  // Version Control
+  version           String @default("1.0")
+  versionNumber     Int @default(1)
+  isLatestVersion   Boolean @default(true)
+  parentDocumentId  String?
+  parentDocument    Document? @relation("DocumentVersions", fields: [parentDocumentId], references: [id])
+  childDocuments    Document[] @relation("DocumentVersions")
+  changeLog         String?
+
+  // Status and Workflow
+  status            DocumentStatus @default(DRAFT)
+  workflowState     String?
+  currentApprovers  String[] // User IDs of current approvers
+
+  // Lifecycle Management
+  publishedAt       DateTime?
+  expiresAt         DateTime?
+  reviewDueAt       DateTime?
+  archivedAt        DateTime?
+  lastReviewedAt    DateTime?
+  lastReviewedBy    String?
+
+  // Content and Search
+  content           String? // Extracted text content for search
+  searchVector      String? // Search vector for full-text search
+  language          String @default("en")
+
+  // Access Control
+  isPublic          Boolean @default(false)
+  permissions       Json? // Document-specific permissions
+  accessLevel       DocumentAccessLevel @default(COMPANY)
+
+  // Compliance and Retention
+  retentionPeriod   Int? // Override default retention period
+  legalHold         Boolean @default(false)
+  complianceNotes   String?
+
+  // Relationships
+  linkedDocuments   DocumentLink[] @relation("SourceDocument")
+  linkedFromDocuments DocumentLink[] @relation("TargetDocument")
+
+  // Metadata
+  metadata          Json? // Custom metadata fields
+  companyId         String
+  company           Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  createdBy         String
+  updatedBy         String?
+
+  // Relations
+  versions          DocumentVersion[]
+  approvals         DocumentApproval[]
+  reviews           DocumentReview[]
+  accessLogs        DocumentAccessLog[]
+  comments          DocumentComment[]
+  attachments       DocumentAttachment[]
+
+  @@index([companyId, status])
+  @@index([categoryId, typeId])
+  @@index([createdBy, companyId])
+  @@index([expiresAt])
+  @@index([reviewDueAt])
+  @@index([checksum])
+
+  @@map("documents")
+}
+
+model DocumentVersion {
+  id          String @id @default(cuid())
+  documentId  String
+  document    Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  version     String
+  versionNumber Int
+  fileName    String
+  filePath    String
+  fileSize    Int
+  checksum    String
+  changeLog   String?
+  createdAt   DateTime @default(now())
+  createdBy   String
+
+  @@index([documentId, versionNumber])
+  @@map("document_versions")
+}
+
+model DocumentApproval {
+  id          String @id @default(cuid())
+  documentId  String
+  document    Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  approverId  String
+  approverRole String?
+  status      DocumentApprovalStatus @default(PENDING)
+  comments    String?
+  approvedAt  DateTime?
+  level       Int @default(1) // Approval level in workflow
+  isRequired  Boolean @default(true)
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([documentId, approverId, level])
+  @@index([documentId, status])
+  @@index([approverId, status])
+  @@map("document_approvals")
+}
+
+model DocumentReview {
+  id          String @id @default(cuid())
+  documentId  String
+  document    Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  reviewerId  String
+  reviewType  DocumentReviewType @default(PERIODIC)
+  status      DocumentReviewStatus @default(PENDING)
+  dueDate     DateTime
+  completedAt DateTime?
+  comments    String?
+  recommendations String?
+  nextReviewDate DateTime?
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  createdBy   String
+
+  @@index([documentId, status])
+  @@index([reviewerId, status])
+  @@index([dueDate])
+  @@map("document_reviews")
+}
+
+model DocumentLink {
+  id              String @id @default(cuid())
+  sourceDocumentId String
+  sourceDocument  Document @relation("SourceDocument", fields: [sourceDocumentId], references: [id], onDelete: Cascade)
+  targetDocumentId String
+  targetDocument  Document @relation("TargetDocument", fields: [targetDocumentId], references: [id], onDelete: Cascade)
+  linkType        DocumentLinkType @default(REFERENCE)
+  description     String?
+
+  createdAt       DateTime @default(now())
+  createdBy       String
+
+  @@unique([sourceDocumentId, targetDocumentId, linkType])
+  @@index([sourceDocumentId])
+  @@index([targetDocumentId])
+  @@map("document_links")
+}
+
+model DocumentAccessLog {
+  id          String @id @default(cuid())
+  documentId  String
+  document    Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  userId      String
+  action      DocumentAccessAction
+  ipAddress   String?
+  userAgent   String?
+  details     Json? // Additional access details
+
+  createdAt   DateTime @default(now())
+
+  @@index([documentId, createdAt])
+  @@index([userId, createdAt])
+  @@index([action, createdAt])
+  @@map("document_access_logs")
+}
+
+model DocumentComment {
+  id          String @id @default(cuid())
+  documentId  String
+  document    Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  parentId    String?
+  parent      DocumentComment? @relation("CommentReplies", fields: [parentId], references: [id])
+  replies     DocumentComment[] @relation("CommentReplies")
+
+  content     String
+  isResolved  Boolean @default(false)
+  resolvedAt  DateTime?
+  resolvedBy  String?
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  createdBy   String
+  updatedBy   String?
+
+  @@index([documentId, createdAt])
+  @@index([createdBy])
+  @@map("document_comments")
+}
+
+model DocumentAttachment {
+  id          String @id @default(cuid())
+  documentId  String
+  document    Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  fileName    String
+  originalFileName String
+  filePath    String
+  fileSize    Int
+  mimeType    String
+  description String?
+
+  createdAt   DateTime @default(now())
+  createdBy   String
+
+  @@index([documentId])
+  @@map("document_attachments")
+}
+
+model DocumentWorkflow {
+  id          String @id @default(cuid())
+  name        String
+  description String?
+  definition  Json // Workflow definition (states, transitions, rules)
+  isActive    Boolean @default(true)
+  version     String @default("1.0")
+
+  // Scope
+  documentTypes String[] // Document type IDs this workflow applies to
+  categories    String[] // Category IDs this workflow applies to
+
+  companyId   String
+  company     Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  createdBy   String
+  updatedBy   String?
+
+  @@unique([name, companyId])
+  @@index([companyId, isActive])
+  @@map("document_workflows")
+}
+
+model DocumentRetentionPolicy {
+  id              String @id @default(cuid())
+  name            String
+  description     String?
+  retentionPeriod Int // Retention period in days
+
+  // Scope
+  documentTypes   String[] // Document type IDs
+  categories      String[] // Category IDs
+  securityLevels  DocumentSecurityLevel[]
+
+  // Actions
+  archiveAfterDays Int? // Days before archiving
+  deleteAfterDays  Int? // Days before deletion
+  notifyBeforeDays Int? // Days before expiry to notify
+
+  // Conditions
+  conditions      Json? // Additional conditions for policy application
+  isActive        Boolean @default(true)
+
+  companyId       String
+  company         Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  createdBy       String
+  updatedBy       String?
+
+  @@unique([name, companyId])
+  @@index([companyId, isActive])
+  @@map("document_retention_policies")
+}
+
+// Document Management Enums
+enum DocumentSecurityLevel {
+  PUBLIC
+  INTERNAL
+  CONFIDENTIAL
+  RESTRICTED
+}
+
+
+
+enum DocumentAccessLevel {
+  PUBLIC
+  COMPANY
+  DEPARTMENT
+  ROLE
+  CUSTOM
+}
+
+enum DocumentApprovalStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  DELEGATED
+}
+
+enum DocumentReviewStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+  OVERDUE
+  CANCELLED
+}
+
+enum DocumentReviewType {
+  PERIODIC
+  TRIGGERED
+  COMPLIANCE
+  QUALITY
+}
+
+enum DocumentLinkType {
+  REFERENCE
+  SUPERSEDES
+  SUPERSEDED_BY
+  RELATED
+  DEPENDENCY
+  ATTACHMENT
+}
+
+enum DocumentAccessAction {
+  VIEW
+  DOWNLOAD
+  EDIT
+  DELETE
+  APPROVE
+  REJECT
+  COMMENT
+  SHARE
+}
+
+// Comprehensive Audit Trail and Compliance Logging System
+
+model AuditEvent {
+  id              String @id @default(cuid())
+  eventId         String @unique // Immutable event identifier
+  timestamp       DateTime @default(now())
+  eventType       AuditEventType
+  category        AuditCategory
+  severity        AuditSeverity @default(INFO)
+
+  // Actor Information
+  userId          String?
+  userEmail       String?
+  userRole        String?
+  sessionId       String?
+  impersonatedBy  String? // For admin impersonation
+
+  // Context Information
+  companyId       String?
+  company         Company? @relation(fields: [companyId], references: [id])
+  resourceType    String? // Document, User, System, etc.
+  resourceId      String? // ID of the affected resource
+  resourceName    String? // Human-readable name
+
+  // Technical Context
+  ipAddress       String?
+  userAgent       String?
+  requestId       String?
+  correlationId   String? // For tracking related events
+
+  // Event Details
+  action          String
+  description     String
+  outcome         AuditOutcome @default(SUCCESS)
+  errorCode       String?
+  errorMessage    String?
+
+  // Data Changes
+  oldValues       Json? // Previous state
+  newValues       Json? // New state
+  changedFields   String[] // List of changed field names
+
+  // Additional Context
+  metadata        Json? // Flexible additional data
+  tags            String[] // For categorization and filtering
+
+  // Security and Integrity
+  checksum        String // SHA-256 hash for integrity
+  digitalSignature String? // Digital signature for non-repudiation
+
+  // Compliance and Retention
+  retentionPeriod Int? // Retention period in days
+  legalHold       Boolean @default(false)
+  complianceFlags String[] // Regulatory compliance markers
+
+  // Relationships
+  relatedEvents   AuditEventRelation[] @relation("SourceEvent")
+  parentEvents    AuditEventRelation[] @relation("TargetEvent")
+
+  @@index([timestamp, companyId])
+  @@index([eventType, category])
+  @@index([userId, timestamp])
+  @@index([resourceType, resourceId])
+  @@index([correlationId])
+  @@index([checksum])
+  @@map("audit_events")
+}
+
+model AuditEventRelation {
+  id              String @id @default(cuid())
+  sourceEventId   String
+  sourceEvent     AuditEvent @relation("SourceEvent", fields: [sourceEventId], references: [id], onDelete: Cascade)
+  targetEventId   String
+  targetEvent     AuditEvent @relation("TargetEvent", fields: [targetEventId], references: [id], onDelete: Cascade)
+  relationType    AuditRelationType
+  description     String?
+
+  createdAt       DateTime @default(now())
+
+  @@unique([sourceEventId, targetEventId, relationType])
+  @@map("audit_event_relations")
+}
+
+model AuditSession {
+  id              String @id @default(cuid())
+  sessionId       String @unique
+  userId          String?
+  userEmail       String?
+  companyId       String?
+  company         Company? @relation(fields: [companyId], references: [id])
+
+  // Session Details
+  startTime       DateTime @default(now())
+  endTime         DateTime?
+  duration        Int? // Duration in seconds
+  isActive        Boolean @default(true)
+
+  // Technical Context
+  ipAddress       String?
+  userAgent       String?
+  deviceInfo      Json?
+  location        Json? // Geolocation data
+
+  // Security Context
+  authMethod      String? // Password, SSO, MFA, etc.
+  riskScore       Float? // Security risk assessment
+  anomalyFlags    String[] // Detected anomalies
+
+  // Activity Summary
+  eventCount      Int @default(0)
+  lastActivity    DateTime @default(now())
+  activitySummary Json? // Summary of session activities
+
+  @@index([userId, startTime])
+  @@index([companyId, startTime])
+  @@index([sessionId])
+  @@map("audit_sessions")
+}
+
+model AuditRetentionPolicy {
+  id              String @id @default(cuid())
+  name            String
+  description     String?
+
+  // Scope
+  eventTypes      AuditEventType[]
+  categories      AuditCategory[]
+  severities      AuditSeverity[]
+  resourceTypes   String[]
+
+  // Retention Rules
+  retentionPeriod Int // Days to retain
+  archiveAfter    Int? // Days before archiving
+  deleteAfter     Int? // Days before deletion
+
+  // Conditions
+  conditions      Json? // Additional retention conditions
+  legalHoldOverride Boolean @default(false)
+
+  // Compliance
+  regulatoryBasis String[] // Legal/regulatory requirements
+  isActive        Boolean @default(true)
+
+  companyId       String
+  company         Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  createdBy       String
+  updatedBy       String?
+
+  @@unique([name, companyId])
+  @@index([companyId, isActive])
+  @@map("audit_retention_policies")
+}
+
+model AuditCompliance {
+  id              String @id @default(cuid())
+  companyId       String
+  company         Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  // Compliance Framework
+  framework       String // SOX, GDPR, HIPAA, etc.
+  version         String?
+  effectiveDate   DateTime
+
+  // Requirements
+  requirements    Json // Specific compliance requirements
+  controls        Json // Implemented controls
+
+  // Assessment
+  lastAssessment  DateTime?
+  nextAssessment  DateTime?
+  complianceScore Float? // 0-100 compliance score
+  status          ComplianceStatus @default(PENDING)
+
+  // Evidence and Documentation
+  evidence        Json? // Links to evidence
+  documentation   String[] // Document IDs
+
+  // Findings and Remediation
+  findings        Json? // Audit findings
+  remediationPlan Json? // Remediation actions
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  createdBy       String
+  updatedBy       String?
+
+  @@index([companyId, framework])
+  @@index([status, nextAssessment])
+  @@map("audit_compliance")
+}
+
+model AuditAlert {
+  id              String @id @default(cuid())
+  alertId         String @unique
+
+  // Alert Details
+  title           String
+  description     String
+  severity        AlertSeverity
+  category        AlertCategory
+
+  // Trigger Information
+  triggeredBy     String // Event ID or rule ID
+  triggerTime     DateTime @default(now())
+  eventCount      Int @default(1)
+
+  // Context
+  companyId       String?
+  company         Company? @relation(fields: [companyId], references: [id])
+  userId          String?
+  resourceType    String?
+  resourceId      String?
+
+  // Alert Data
+  alertData       Json // Detailed alert information
+  riskScore       Float? // Risk assessment score
+
+  // Status and Resolution
+  status          AlertStatus @default(OPEN)
+  assignedTo      String?
+  resolvedAt      DateTime?
+  resolution      String?
+
+  // Notifications
+  notificationsSent String[] // List of notification channels used
+  escalationLevel Int @default(0)
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([companyId, status])
+  @@index([severity, triggerTime])
+  @@index([category, status])
+  @@map("audit_alerts")
+}
+
+model AuditArchive {
+  id              String @id @default(cuid())
+  originalEventId String @unique
+
+  // Archive Information
+  archivedAt      DateTime @default(now())
+  archiveReason   String
+  archiveLocation String // Storage location reference
+
+  // Original Event Data (compressed/encrypted)
+  eventData       Bytes // Compressed and encrypted event data
+  checksum        String // Integrity verification
+
+  // Metadata
+  companyId       String
+  eventType       AuditEventType
+  originalTimestamp DateTime
+  retentionUntil  DateTime?
+
+  @@index([companyId, originalTimestamp])
+  @@index([eventType, archivedAt])
+  @@map("audit_archives")
+}
+
+// Audit System Enums
+enum AuditEventType {
+  USER_ACTION
+  SYSTEM_EVENT
+  SECURITY_EVENT
+  DATA_CHANGE
+  ACCESS_EVENT
+  WORKFLOW_EVENT
+  COMPLIANCE_EVENT
+  ADMIN_ACTION
+  API_CALL
+  ERROR_EVENT
+}
+
+enum AuditCategory {
+  AUTHENTICATION
+  AUTHORIZATION
+  DATA_ACCESS
+  DATA_MODIFICATION
+  SYSTEM_CONFIGURATION
+  USER_MANAGEMENT
+  DOCUMENT_MANAGEMENT
+  WORKFLOW_MANAGEMENT
+  COMPLIANCE_MONITORING
+  SECURITY_MONITORING
+  PERFORMANCE_MONITORING
+  ERROR_HANDLING
+}
+
+enum AuditSeverity {
+  CRITICAL
+  HIGH
+  MEDIUM
+  LOW
+  INFO
+}
+
+enum AuditOutcome {
+  SUCCESS
+  FAILURE
+  PARTIAL_SUCCESS
+  BLOCKED
+  ERROR
+}
+
+enum AuditRelationType {
+  CAUSED_BY
+  TRIGGERED
+  RELATED_TO
+  FOLLOWS
+  PRECEDES
+  PART_OF
+}
+
+
+
+enum AlertSeverity {
+  CRITICAL
+  HIGH
+  MEDIUM
+  LOW
+}
+
+enum AlertCategory {
+  SECURITY_BREACH
+  COMPLIANCE_VIOLATION
+  SYSTEM_ANOMALY
+  PERFORMANCE_ISSUE
+  DATA_INTEGRITY
+  ACCESS_VIOLATION
+  POLICY_VIOLATION
+}
+
+enum AlertStatus {
+  OPEN
+  ACKNOWLEDGED
+  INVESTIGATING
+  RESOLVED
+  CLOSED
+  FALSE_POSITIVE
+}

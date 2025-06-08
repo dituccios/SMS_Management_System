@@ -1,0 +1,78 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    container_name: sms_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: sms_management
+      POSTGRES_USER: sms_user
+      POSTGRES_PASSWORD: sms_password
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./database/init:/docker-entrypoint-initdb.d
+    networks:
+      - sms_network
+
+  # Backend API
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: sms_backend
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgresql://sms_user:sms_password@postgres:5432/sms_management
+      JWT_SECRET: your-production-jwt-secret-change-this
+      PORT: 3001
+      CORS_ORIGIN: http://localhost:3000
+    ports:
+      - "3001:3001"
+    depends_on:
+      - postgres
+    volumes:
+      - ./backend/uploads:/app/uploads
+      - ./backend/logs:/app/logs
+    networks:
+      - sms_network
+
+  # Frontend Application
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: sms_frontend
+    restart: unless-stopped
+    environment:
+      REACT_APP_API_URL: http://localhost:3001/api/v1
+    ports:
+      - "3000:80"
+    depends_on:
+      - backend
+    networks:
+      - sms_network
+
+  # Redis (Optional - for caching and sessions)
+  redis:
+    image: redis:7-alpine
+    container_name: sms_redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - sms_network
+
+volumes:
+  postgres_data:
+  redis_data:
+
+networks:
+  sms_network:
+    driver: bridge

@@ -1,0 +1,207 @@
+Here's the expanded schema integrating all requested ISO standards, with applicability markers:
+
+Q: ISO 9001:2015 (Quality)
+
+E: ISO 14001:2015 (Environmental)
+
+S: ISO 45001:2018 (OH&S)
+
+I: ISO/IEC 27001:2022 (Information Security)
+
+A: ISO/IEC 42001:2023 (AI Management)
+
+SR: ISO 26000:2010 (Social Responsibility)
+
+En: ISO 50001:2018 (Energy)
+
+1. Organization & Context
+Field	Type	Applicability	Description
+org_name	Text	All	Organization name
+scope_qms	Text	Q	Scope of QMS
+scope_ems	Text	E	Scope of EMS
+scope_ohs	Text	S	Scope of OH&S
+scope_isms	Text	I	Scope of ISMS (ISO 27001)
+scope_aims	Text	A	Scope of AIMS (ISO 42001)
+scope_energy	Text	En	Scope of EnMS (ISO 50001)
+interested_parties	JSON	All	Stakeholders (customers, regulators, communities)
+internal_issues	Text	All	Internal challenges (resources, culture, etc.)
+external_issues	Text	All	External challenges (regulations, market, etc.)
+sr_context	Text	SR	Social responsibility context
+ai_system_inventory	JSON	A	List of AI systems in use (ISO 42001)
+2. Leadership & Commitment
+Field	Type	Applicability	Description
+quality_policy	Text	Q	Quality policy
+environmental_policy	Text	E	Environmental policy
+ohs_policy	Text	S	OH&S policy
+infosec_policy	Text	I	Information security policy
+ai_governance_policy	Text	A	AI management policy
+energy_policy	Text	En	Energy management policy
+sr_commitment	Text	SR	Social responsibility commitment
+roles_responsibilities	JSON	All	Roles with assigned responsibilities
+mgmt_commitment_evidence	Text	All	Proof of leadership involvement
+3. Planning
+3.1. Risks & Opportunities
+Field	Type	Applicability	Description
+risk_id	ID	All	Unique risk identifier
+risk_category	Enum	All	Quality, Environmental, OH&S, Infosec, AI, Energy, Social
+risk_source	Enum	All	Process, Supplier, Legal, Cyber, Bias, Community
+ai_risk_type	Enum	A	Bias, Security, Transparency, Safety (ISO 42001)
+infosec_asset	Text	I	Affected asset (data, system)
+risk_impact	Enum	All	Critical, High, Medium, Low
+mitigation_plan	Text	All	Action plan to address risk
+3.2. Objectives & Targets
+Field	Type	Applicability	Description
+objective_id	ID	All	Unique objective ID
+objective_type	Enum	All	Quality, Env, OH&S, Infosec, AI, Energy, Social
+energy_target	Float	En	Energy consumption target (kWh)
+ai_ethics_kpi	Text	A	AI ethics KPI (e.g., "Bias reduction rate")
+target_value	Float	All	Numerical target value
+deadline	Date	All	Target completion date
+3.3. Legal & Other Requirements
+Field	Type	Applicability	Description
+requirement_id	ID	All	Unique requirement ID
+requirement_standard	Enum	All	Q, E, S, I, A, En, SR
+regulation_type	Enum	All	GDPR, NIST, Cybersecurity Law, Labor Law
+ai_ethics_standard	Text	A	AI ethics framework applied
+compliance_status	Enum	All	Compliant, Non-Compliant, Pending
+4. Support
+4.1. Resources & Competence
+Field	Type	Applicability	Description
+training_record_id	ID	All	Training session ID
+infosec_cert_level	Enum	I	CISSP, CISM, CompTIA Security+
+ai_competency	Enum	A	AI Ethics, ML Ops, Bias Mitigation
+energy_auditor_cert	Text	En	Energy auditor certification number
+competency_status	Enum	All	Qualified, In Training, Needs Evaluation
+4.2. Awareness & Communication
+Field	Type	Applicability	Description
+comm_id	ID	All	Communication record ID
+comm_channel	Enum	All	Email, Meeting, Dashboard, Training
+privacy_notice	Boolean	I, A	Privacy notice communicated (Y/N)
+sr_awareness	Boolean	SR	Social responsibility awareness done
+4.3. Documented Information
+Field	Type	Applicability	Description
+doc_id	ID	All	Document ID
+doc_category	Enum	All	Policy, Procedure, Record, AI Model Card
+access_control_level	Enum	I, A	Public, Restricted, Confidential
+energy_monitoring_log	Text	En	Energy consumption log location
+5. Operations
+5.1. Operational Controls
+Field	Type	Applicability	Description
+process_id	ID	All	Unique process ID
+infosec_controls	JSON	I	Encryption, MFA, Access logs (ISO 27001)
+ai_bias_controls	Text	A	Bias detection methods (ISO 42001)
+energy_consumption	Float	En	Real-time energy usage (kWh)
+community_impact	Text	SR	Community engagement actions
+5.2. Emergency Preparedness
+Field	Type	Applicability	Description
+emergency_id	ID	E,S,I,A	Emergency scenario ID
+cyber_incident_type	Enum	I	Breach, Ransomware, DDoS
+ai_failure_scenario	Enum	A	Bias Incident, Safety Failure, Data Poisoning
+response_plan	Text	E,S,I,A	Response steps
+6. Performance Evaluation
+6.1. Monitoring & Measurement
+Field	Type	Applicability	Description
+metric_id	ID	All	Unique metric ID
+security_metrics	JSON	I	Incident Rate, Patch Time, Phishing Test Pass
+ai_performance	JSON	A	Accuracy, Fairness Score, Drift Detection
+carbon_footprint	Float	E, En	CO2 emissions (tons)
+sr_compliance_score	Float	SR	Social responsibility score
+6.2. Internal Audit
+Field	Type	Applicability	Description
+audit_standard	Enum	All	QMS, EMS, OH&S, ISMS, AIMS, EnMS, SR
+infosec_test_results	Text	I	Penetration test results
+ai_system_audit	Text	A	AI system validation report
+energy_efficiency_audit	Text	En	Energy performance report
+7. Improvement
+7.1. Nonconformity & Corrective Action
+Field	Type	Applicability	Description
+nc_source	Enum	All	Audit, Complaint, Cyber Incident, AI Failure
+data_breach_details	Text	I	PII records affected
+ai_incident_root_cause	Text	A	Root cause of AI failure
+energy_waste_source	Text	En	Source of energy inefficiency
+7.2. Incident Management
+Field	Type	Applicability	Description
+incident_category	Enum	All	OH&S, Environmental, Infosec, AI, Energy
+cyber_incident_severity	Enum	I	Catastrophic, Major, Minor (NIST Scale)
+ai_impact_level	Enum	A	Individual, Group, Societal
+community_impact_level	Enum	SR	Local, Regional, National
+Key Enhancements
+Cross-Standard Linkages:
+
+Risks → Objectives (Many-to-Many)
+
+Nonconformities → Corrective Actions (1-to-1)
+
+Processes → Controls (1-to-Many)
+
+AI Systems ↔ Infosec Controls (Bidirectional)
+
+New Modules:
+
+AI Governance: Model cards, bias controls, ethics KPIs
+
+Energy Management: Real-time monitoring, efficiency audits
+
+Social Responsibility: Community impact assessments
+
+Integrated Risk: Cyber-physical risk mapping
+
+Automation Features:
+
+AI drift detection alerts
+
+Energy consumption forecasting
+
+Automated compliance dashboards
+
+Cross-standard gap analysis reports
+
+Evidence Management:
+
+Blockchain-based document integrity (ISO 27001)
+
+AI training data versioning (ISO 42001)
+
+Energy calibration certificates (ISO 50001)
+
+Implementation Strategy
+Diagram
+Code
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Database Recommendations:
+
+PostgreSQL: For transactional data (audits, incidents)
+
+MongoDB: For unstructured data (policies, risk assessments)
+
+TimeScaleDB: For energy/emissions time-series data
+
+Compliance Automation:
+
+NLP for regulation updates
+
+Smart contracts for evidence chain-of-custody
+
+API integrations with:
+
+Energy monitoring systems
+
+Security information tools (SIEM)
+
+AI monitoring platforms
+
+This integrated schema supports all 7 ISO standards while maintaining the Annex SL structure. Custom fields can be added per organizational needs without disrupting core compliance tracking.
