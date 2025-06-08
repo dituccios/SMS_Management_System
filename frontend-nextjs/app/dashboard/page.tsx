@@ -5,6 +5,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../..
 import { Button } from '../../components/ui/button';
 import { Badge } from '../../components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../components/ui/tabs';
+import { KPICard } from '../../components/ui/kpi-card';
+import { AlertCard } from '../../components/ui/alert-card';
+import { MainLayout } from '../../components/layout/main-layout';
 import {
   Brain,
   TrendingUp,
@@ -20,7 +23,15 @@ import {
   Clock,
   ArrowUp,
   ArrowDown,
-  Eye
+  Eye,
+  Award,
+  BookOpen,
+  Lightbulb,
+  Gauge,
+  TrendingDown,
+  Calendar,
+  ArrowRight,
+  Sparkles
 } from 'lucide-react';
 
 // Import our AI components (commented out for now - will create simplified versions)
@@ -39,32 +50,44 @@ export default function DashboardPage() {
       complianceScore: 94,
       complianceTrend: 3,
       trainingCompletion: 87,
-      trainingTrend: 5
+      trainingTrend: 5,
+      aiAccuracy: 95.8,
+      aiTrend: 2.1,
+      predictionsGenerated: 1247,
+      predictionsTrend: 15.3
     },
     recentAlerts: [
       {
         id: 1,
-        type: 'HIGH_RISK',
+        type: 'HIGH_RISK' as const,
         title: 'Elevated Risk Level Detected',
-        description: 'AI model detected increased risk in Manufacturing Unit A',
+        description: 'AI model detected increased risk in Manufacturing Unit A based on recent incident patterns',
         timestamp: '2 minutes ago',
-        severity: 'HIGH'
+        severity: 'HIGH' as const
       },
       {
         id: 2,
-        type: 'TRAINING_DUE',
+        type: 'WARNING' as const,
         title: 'Training Compliance Alert',
-        description: '15 employees have overdue safety training',
+        description: '15 employees have overdue safety training certifications',
         timestamp: '2 hours ago',
-        severity: 'MEDIUM'
+        severity: 'MEDIUM' as const
       },
       {
         id: 3,
-        type: 'PREDICTION',
-        title: 'Incident Prediction',
-        description: 'AI forecasts potential incident in next 7 days',
+        type: 'INFO' as const,
+        title: 'AI Prediction Update',
+        description: 'Machine learning model forecasts 12% reduction in incidents next quarter',
         timestamp: '4 hours ago',
-        severity: 'HIGH'
+        severity: 'LOW' as const
+      },
+      {
+        id: 4,
+        type: 'SUCCESS' as const,
+        title: 'Compliance Target Achieved',
+        description: 'Safety compliance score reached 94% - exceeding quarterly target',
+        timestamp: '6 hours ago',
+        severity: 'LOW' as const
       }
     ],
     aiInsights: [
@@ -117,33 +140,10 @@ export default function DashboardPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <div className="bg-white border-b border-gray-200 px-6 py-4">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900">
-              AI-Powered SMS Dashboard
-            </h1>
-            <p className="text-gray-600">
-              Intelligent safety management with predictive analytics
-            </p>
-          </div>
-          <div className="flex items-center space-x-4">
-            <Badge className="bg-green-100 text-green-800">
-              <Activity className="h-3 w-3 mr-1" />
-              System Healthy
-            </Badge>
-            <Button variant="outline" size="sm">
-              <Eye className="h-4 w-4 mr-2" />
-              View Reports
-            </Button>
-          </div>
-        </div>
-      </div>
-
-      {/* Main Content */}
-      <div className="p-6">
+    <MainLayout
+      title="AI-Powered SMS Dashboard"
+      subtitle="Intelligent safety management with predictive analytics and machine learning insights"
+    >
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
           <TabsList className="grid w-full grid-cols-4">
             <TabsTrigger value="overview">Overview</TabsTrigger>
@@ -153,166 +153,226 @@ export default function DashboardPage() {
           </TabsList>
 
           {/* Overview Tab */}
-          <TabsContent value="overview" className="space-y-6">
-            {/* KPI Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Total Incidents</CardTitle>
-                  <AlertTriangle className="h-4 w-4 text-red-600" />
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold">{dashboardData.kpis.totalIncidents}</div>
-                  <div className="flex items-center text-xs text-gray-600">
-                    {getTrendIcon(dashboardData.kpis.incidentTrend)}
-                    <span className="ml-1">{Math.abs(dashboardData.kpis.incidentTrend)}% from last month</span>
-                  </div>
-                </CardContent>
-              </Card>
+          <TabsContent value="overview" className="space-y-8">
+            {/* Enhanced KPI Cards */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-6">
+              <KPICard
+                title="Total Incidents"
+                value={dashboardData.kpis.totalIncidents}
+                change={dashboardData.kpis.incidentTrend}
+                changeLabel="vs last month"
+                icon={AlertTriangle}
+                iconColor="text-red-600"
+                trend={dashboardData.kpis.incidentTrend < 0 ? 'down' : 'up'}
+                description="Safety incidents reported this month"
+                badge="Critical"
+                badgeVariant="destructive"
+              />
 
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Risk Score</CardTitle>
-                  <Shield className="h-4 w-4 text-orange-600" />
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold">{dashboardData.kpis.riskScore}/10</div>
-                  <div className="flex items-center text-xs text-gray-600">
-                    {getTrendIcon(dashboardData.kpis.riskTrend)}
-                    <span className="ml-1">{Math.abs(dashboardData.kpis.riskTrend)}% improvement</span>
-                  </div>
-                </CardContent>
-              </Card>
+              <KPICard
+                title="Risk Score"
+                value={`${dashboardData.kpis.riskScore}/10`}
+                change={dashboardData.kpis.riskTrend}
+                changeLabel="improvement"
+                icon={Shield}
+                iconColor="text-orange-600"
+                trend={dashboardData.kpis.riskTrend < 0 ? 'down' : 'up'}
+                description="Overall organizational risk level"
+                badge="Monitored"
+                badgeVariant="secondary"
+              />
 
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Compliance Score</CardTitle>
-                  <CheckCircle className="h-4 w-4 text-green-600" />
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold">{dashboardData.kpis.complianceScore}%</div>
-                  <div className="flex items-center text-xs text-gray-600">
-                    {getTrendIcon(dashboardData.kpis.complianceTrend)}
-                    <span className="ml-1">{Math.abs(dashboardData.kpis.complianceTrend)}% from last month</span>
-                  </div>
-                </CardContent>
-              </Card>
+              <KPICard
+                title="Compliance Score"
+                value={`${dashboardData.kpis.complianceScore}%`}
+                change={dashboardData.kpis.complianceTrend}
+                changeLabel="vs target"
+                icon={CheckCircle}
+                iconColor="text-green-600"
+                trend="up"
+                description="Regulatory compliance achievement"
+                badge="Excellent"
+                badgeVariant="secondary"
+              />
 
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Training Completion</CardTitle>
-                  <Users className="h-4 w-4 text-blue-600" />
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold">{dashboardData.kpis.trainingCompletion}%</div>
-                  <div className="flex items-center text-xs text-gray-600">
-                    {getTrendIcon(dashboardData.kpis.trainingTrend)}
-                    <span className="ml-1">{Math.abs(dashboardData.kpis.trainingTrend)}% from last month</span>
-                  </div>
-                </CardContent>
-              </Card>
+              <KPICard
+                title="Training Completion"
+                value={`${dashboardData.kpis.trainingCompletion}%`}
+                change={dashboardData.kpis.trainingTrend}
+                changeLabel="completion rate"
+                icon={BookOpen}
+                iconColor="text-blue-600"
+                trend="up"
+                description="Employee training progress"
+                badge="On Track"
+                badgeVariant="secondary"
+              />
+
+              <KPICard
+                title="AI Accuracy"
+                value={`${dashboardData.kpis.aiAccuracy}%`}
+                change={dashboardData.kpis.aiTrend}
+                changeLabel="model performance"
+                icon={Brain}
+                iconColor="text-purple-600"
+                trend="up"
+                description="Machine learning prediction accuracy"
+                badge="AI"
+                badgeVariant="secondary"
+              />
+
+              <KPICard
+                title="Predictions Generated"
+                value={dashboardData.kpis.predictionsGenerated.toLocaleString()}
+                change={dashboardData.kpis.predictionsTrend}
+                changeLabel="this month"
+                icon={Sparkles}
+                iconColor="text-indigo-600"
+                trend="up"
+                description="AI-powered insights delivered"
+                badge="Active"
+                badgeVariant="secondary"
+              />
             </div>
 
             {/* Recent Alerts and AI Insights */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
               {/* Recent Alerts */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center">
-                    <AlertTriangle className="h-5 w-5 text-orange-600 mr-2" />
-                    Recent Alerts
-                  </CardTitle>
-                  <CardDescription>
-                    Latest system alerts and notifications
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
-                    {dashboardData.recentAlerts.map((alert) => (
-                      <div key={alert.id} className="flex items-start space-x-3 p-3 rounded-lg border">
-                        <div className="flex-1">
-                          <div className="flex items-center justify-between">
-                            <h4 className="font-medium text-sm">{alert.title}</h4>
-                            <Badge className={getSeverityColor(alert.severity)}>
-                              {alert.severity}
-                            </Badge>
-                          </div>
-                          <p className="text-sm text-gray-600 mt-1">{alert.description}</p>
-                          <div className="flex items-center text-xs text-gray-500 mt-2">
-                            <Clock className="h-3 w-3 mr-1" />
-                            {alert.timestamp}
-                          </div>
-                        </div>
-                      </div>
-                    ))}
+              <div className="space-y-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h2 className="text-xl font-semibold text-foreground flex items-center">
+                      <AlertTriangle className="h-5 w-5 text-orange-600 mr-2" />
+                      Recent Alerts
+                    </h2>
+                    <p className="text-sm text-muted-foreground mt-1">
+                      Latest system alerts and notifications
+                    </p>
                   </div>
-                </CardContent>
-              </Card>
+                  <Button variant="outline" size="sm">
+                    <Eye className="h-4 w-4 mr-2" />
+                    View All
+                  </Button>
+                </div>
+                <div className="space-y-4">
+                  {dashboardData.recentAlerts.map((alert) => (
+                    <AlertCard
+                      key={alert.id}
+                      id={alert.id}
+                      type={alert.type}
+                      title={alert.title}
+                      description={alert.description}
+                      timestamp={alert.timestamp}
+                      severity={alert.severity}
+                      actionable={alert.type === 'HIGH_RISK' || alert.type === 'WARNING'}
+                      onAction={() => console.log('Action clicked for alert:', alert.id)}
+                      onDismiss={() => console.log('Dismiss clicked for alert:', alert.id)}
+                    />
+                  ))}
+                </div>
+              </div>
 
               {/* AI Insights */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center">
-                    <Brain className="h-5 w-5 text-purple-600 mr-2" />
-                    AI Insights
-                  </CardTitle>
-                  <CardDescription>
-                    Machine learning predictions and recommendations
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
-                    {dashboardData.aiInsights.map((insight) => (
-                      <div key={insight.id} className="flex items-start space-x-3 p-3 rounded-lg border">
-                        <div className="flex-1">
-                          <div className="flex items-center justify-between">
-                            <h4 className="font-medium text-sm">{insight.title}</h4>
-                            <div className="flex items-center space-x-2">
-                              {getImpactIcon(insight.impact)}
-                              <span className="text-xs text-gray-500">{insight.confidence}%</span>
+              <div className="space-y-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h2 className="text-xl font-semibold text-foreground flex items-center">
+                      <Brain className="h-5 w-5 text-purple-600 mr-2" />
+                      AI Insights
+                    </h2>
+                    <p className="text-sm text-muted-foreground mt-1">
+                      Machine learning predictions and recommendations
+                    </p>
+                  </div>
+                  <Button variant="outline" size="sm">
+                    <Lightbulb className="h-4 w-4 mr-2" />
+                    More Insights
+                  </Button>
+                </div>
+                <div className="space-y-4">
+                  {dashboardData.aiInsights.map((insight) => (
+                    <Card key={insight.id} className="relative overflow-hidden group hover:shadow-lg transition-all duration-300">
+                      <CardContent className="p-6">
+                        <div className="flex items-start justify-between">
+                          <div className="flex-1">
+                            <div className="flex items-center space-x-3 mb-3">
+                              <div className={`p-2 rounded-lg ${insight.impact === 'POSITIVE' ? 'bg-green-100 text-green-600' : 'bg-orange-100 text-orange-600'}`}>
+                                {insight.impact === 'POSITIVE' ?
+                                  <TrendingUp className="h-4 w-4" /> :
+                                  <TrendingDown className="h-4 w-4" />
+                                }
+                              </div>
+                              <div>
+                                <h3 className="font-semibold text-foreground">{insight.title}</h3>
+                                <div className="flex items-center space-x-2 mt-1">
+                                  <Badge variant="outline" className="text-xs">
+                                    {insight.confidence}% Confidence
+                                  </Badge>
+                                  <Badge variant={insight.impact === 'POSITIVE' ? 'secondary' : 'outline'} className="text-xs">
+                                    {insight.type}
+                                  </Badge>
+                                </div>
+                              </div>
+                            </div>
+                            <p className="text-sm text-muted-foreground leading-relaxed mb-4">
+                              {insight.description}
+                            </p>
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center space-x-2 text-xs text-muted-foreground">
+                                <Gauge className="h-3 w-3" />
+                                <span>Confidence: {insight.confidence}%</span>
+                              </div>
+                              <Button variant="ghost" size="sm" className="h-7 text-xs">
+                                View Details
+                                <ArrowRight className="h-3 w-3 ml-1" />
+                              </Button>
                             </div>
                           </div>
-                          <p className="text-sm text-gray-600 mt-1">{insight.description}</p>
-                          <div className="flex items-center text-xs text-gray-500 mt-2">
-                            <Target className="h-3 w-3 mr-1" />
-                            Confidence: {insight.confidence}%
-                          </div>
                         </div>
-                      </div>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
+                      </CardContent>
+                      <div className={`absolute inset-0 bg-gradient-to-br from-transparent via-transparent ${insight.impact === 'POSITIVE' ? 'to-green-500/5' : 'to-orange-500/5'} opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none`} />
+                    </Card>
+                  ))}
+                </div>
+              </div>
             </div>
 
             {/* Quick Actions */}
-            <Card>
+            <Card className="bg-gradient-to-br from-primary/5 via-background to-accent/5">
               <CardHeader>
                 <CardTitle className="flex items-center">
                   <Zap className="h-5 w-5 text-yellow-600 mr-2" />
                   Quick Actions
                 </CardTitle>
                 <CardDescription>
-                  Common tasks and shortcuts
+                  Common tasks and AI-powered shortcuts
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                  <Button variant="outline" className="h-20 flex flex-col items-center justify-center">
-                    <AlertTriangle className="h-6 w-6 mb-2" />
-                    <span className="text-sm">Report Incident</span>
+                <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
+                  <Button variant="outline" className="h-24 flex flex-col items-center justify-center hover:shadow-md transition-all duration-200 group">
+                    <AlertTriangle className="h-6 w-6 mb-2 text-red-600 group-hover:scale-110 transition-transform" />
+                    <span className="text-sm font-medium">Report Incident</span>
                   </Button>
-                  <Button variant="outline" className="h-20 flex flex-col items-center justify-center">
-                    <Shield className="h-6 w-6 mb-2" />
-                    <span className="text-sm">Risk Assessment</span>
+                  <Button variant="outline" className="h-24 flex flex-col items-center justify-center hover:shadow-md transition-all duration-200 group">
+                    <Shield className="h-6 w-6 mb-2 text-orange-600 group-hover:scale-110 transition-transform" />
+                    <span className="text-sm font-medium">Risk Assessment</span>
                   </Button>
-                  <Button variant="outline" className="h-20 flex flex-col items-center justify-center">
-                    <Users className="h-6 w-6 mb-2" />
-                    <span className="text-sm">Assign Training</span>
+                  <Button variant="outline" className="h-24 flex flex-col items-center justify-center hover:shadow-md transition-all duration-200 group">
+                    <BookOpen className="h-6 w-6 mb-2 text-blue-600 group-hover:scale-110 transition-transform" />
+                    <span className="text-sm font-medium">Assign Training</span>
                   </Button>
-                  <Button variant="outline" className="h-20 flex flex-col items-center justify-center">
-                    <FileText className="h-6 w-6 mb-2" />
-                    <span className="text-sm">Generate Report</span>
+                  <Button variant="outline" className="h-24 flex flex-col items-center justify-center hover:shadow-md transition-all duration-200 group">
+                    <FileText className="h-6 w-6 mb-2 text-green-600 group-hover:scale-110 transition-transform" />
+                    <span className="text-sm font-medium">Generate Report</span>
+                  </Button>
+                  <Button variant="outline" className="h-24 flex flex-col items-center justify-center hover:shadow-md transition-all duration-200 group">
+                    <Brain className="h-6 w-6 mb-2 text-purple-600 group-hover:scale-110 transition-transform" />
+                    <span className="text-sm font-medium">AI Analysis</span>
+                  </Button>
+                  <Button variant="outline" className="h-24 flex flex-col items-center justify-center hover:shadow-md transition-all duration-200 group">
+                    <BarChart3 className="h-6 w-6 mb-2 text-indigo-600 group-hover:scale-110 transition-transform" />
+                    <span className="text-sm font-medium">View Analytics</span>
                   </Button>
                 </div>
               </CardContent>
@@ -447,7 +507,6 @@ export default function DashboardPage() {
             </Card>
           </TabsContent>
         </Tabs>
-      </div>
-    </div>
+    </MainLayout>
   );
 }

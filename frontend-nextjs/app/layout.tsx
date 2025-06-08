@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { Inter, Lato } from 'next/font/google';
+import { Inter, Poppins, JetBrains_Mono } from 'next/font/google';
 import './globals.css';
 import { Providers } from './providers';
 import { Toaster } from 'react-hot-toast';
@@ -10,28 +10,39 @@ const inter = Inter({
   display: 'swap',
 });
 
-const lato = Lato({
-  weight: ['100', '300', '400', '700', '900'],
+const poppins = Poppins({
+  weight: ['100', '200', '300', '400', '500', '600', '700', '800', '900'],
   subsets: ['latin'],
-  variable: '--font-lato',
+  variable: '--font-poppins',
+  display: 'swap',
+});
+
+const jetbrainsMono = JetBrains_Mono({
+  subsets: ['latin'],
+  variable: '--font-jetbrains-mono',
   display: 'swap',
 });
 
 export const metadata: Metadata = {
   title: {
-    default: 'SMS Management System',
-    template: '%s | SMS Management',
+    default: 'SMS Management System with AI-Powered Intelligence',
+    template: '%s | SMS Management AI',
   },
-  description: 'Comprehensive Safety Management System for enterprise organizations. Manage documents, workflows, incidents, training, and compliance in one platform.',
+  description: 'Enterprise-grade Safety Management System with AI-powered intelligence. Advanced predictive analytics, risk assessment, and intelligent decision support for modern safety management.',
   keywords: [
     'safety management',
     'SMS',
-    'compliance',
+    'AI-powered safety',
+    'predictive analytics',
     'risk assessment',
+    'machine learning',
+    'compliance forecasting',
     'incident management',
     'document management',
     'workflow automation',
     'training management',
+    'decision support',
+    'enterprise safety',
   ],
   authors: [
     {
@@ -96,17 +107,17 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" className={`${inter.variable} ${lato.variable}`}>
+    <html lang="en" className={`${inter.variable} ${poppins.variable} ${jetbrainsMono.variable}`}>
       <head>
         <link rel="icon" href="/favicon.ico" sizes="any" />
         <link rel="icon" href="/icon.svg" type="image/svg+xml" />
         <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
         <link rel="manifest" href="/manifest.json" />
-        <meta name="theme-color" content="#2563eb" />
+        <meta name="theme-color" content="#3b82f6" />
         <meta name="color-scheme" content="light dark" />
         <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5" />
       </head>
-      <body className="min-h-screen bg-gray-50 font-sans antialiased">
+      <body className="min-h-screen bg-background text-foreground font-sans antialiased">
         <Providers>
           <div className="relative flex min-h-screen flex-col">
             <main className="flex-1">{children}</main>
