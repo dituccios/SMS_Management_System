@@ -223,7 +223,7 @@ export default function DashboardPage() {
 
               <KPICard
                 title="Predictions Generated"
-                value={dashboardData.kpis.predictionsGenerated.toLocaleString()}
+                value={`${dashboardData.kpis.predictionsGenerated}`}
                 change={dashboardData.kpis.predictionsTrend}
                 changeLabel="this month"
                 icon={Sparkles}
